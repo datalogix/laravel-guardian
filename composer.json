@@ -1,0 +1,57 @@
+{
+    "name": "datalogix/laravel-fortress",
+    "description": "",
+    "keywords": [],
+    "homepage": "https://github.com/datalogix/laravel-fortress",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Ricardo Gobbo de Souza",
+            "email": "ricardogobbosouza@yahoo.com.br"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "laravel/framework": "^12.0",
+        "livewire/livewire": "^3.6"
+    },
+    "autoload": {
+        "psr-4": {
+            "Datalogix\\Fortress\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Datalogix\\Fortress\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "dev": [
+            "@composer update",
+            "@composer test",
+            "pnpm install",
+            "pnpm dev"
+        ],
+        "lint": [
+            "@php pint",
+            "pnpm lint"
+        ],
+        "test": "vendor/bin/phpunit"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Datalogix\\Fortress\\FortressServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require-dev": {
+        "laravel/pint": "^1.24"
+    }
+}
