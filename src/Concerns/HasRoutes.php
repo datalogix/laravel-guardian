@@ -1,12 +1,11 @@
 <?php
 
-namespace Datalogix\Fortress\Concerns;
+namespace Datalogix\Guardian\Concerns;
 
 use Closure;
-use Datalogix\Fortress\Facades\Fortress;
-use Illuminate\Http\RedirectResponse;
+use Datalogix\Guardian\Guardian;
 use Illuminate\Support\Arr;
-use Livewire\Features\SupportRedirects\Redirector;
+use Illuminate\Support\Facades\Route;
 
 trait HasRoutes
 {
@@ -48,8 +47,12 @@ trait HasRoutes
         return $this;
     }
 
-    public function routes(?Closure $routes): static
+    public function routes(?Closure $routes, ?bool $authenticated = null): static
     {
+        if ($authenticated) {
+            return $this->authenticatedRoutes($routes);
+        }
+
         $this->routes[] = $routes;
 
         return $this;
@@ -67,7 +70,7 @@ trait HasRoutes
         return route($this->generateRouteName($name), $parameters, $absolute);
     }
 
-    public function redirect(?string $path = null, bool $intended = false, bool $navigate = true): RedirectResponse|Redirector|null
+    public function redirect(?string $path = null, bool $intended = false, bool $navigate = true)
     {
         $path ??= $this->getUrl();
         $livewire = app('livewire')?->current();
@@ -94,10 +97,10 @@ trait HasRoutes
         }
 
         if (count($this->domains) > 1 && $domain === '') {
-            $domain = Fortress::getCurrentDomain(Arr::first($this->domains)).'.';
+            $domain = Guardian::getCurrentDomain(Arr::first($this->domains)).'.';
         }
 
-        return "fortress.{$this->getId()}.{$domain}{$name}";
+        return "guardian.{$this->getId()}.{$domain}{$name}";
     }
 
     public function getRoutes(): array
@@ -132,5 +135,23 @@ trait HasRoutes
         }
 
         return url($this->getPath());
+    }
+
+    public function registerRoutes(): static
+    {
+        foreach ($this->getRoutes() as $routes) {
+            $routes($this);
+        }
+
+        Route::middleware([
+            ...$this->getAuthMiddleware(),
+            ...($this->isEmailVerificationRequired() ? [$this->getEmailVerifiedMiddleware()] : []),
+        ])->group(function () {
+            foreach ($this->getAuthenticatedRoutes() as $routes) {
+                $routes($this);
+            }
+        });
+
+        return $this;
     }
 }

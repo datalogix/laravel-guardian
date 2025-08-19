@@ -1,8 +1,9 @@
 <?php
 
-namespace Datalogix\Fortress\Concerns;
+namespace Datalogix\Guardian\Concerns;
 
 use Closure;
+use Livewire\Livewire;
 
 trait HasLifecycleHooks
 {
@@ -24,7 +25,9 @@ trait HasLifecycleHooks
 
     public function register(): void
     {
-        $this->registerLivewireComponents();
-        $this->registerLivewirePersistentMiddleware();
+        if (class_exists(Livewire::class)) {
+            $this->registerLivewireComponents();
+            $this->registerLivewirePersistentMiddleware();
+        }
     }
 }

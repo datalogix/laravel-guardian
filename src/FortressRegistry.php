@@ -1,9 +1,10 @@
 <?php
 
-namespace Datalogix\Fortress;
+namespace Datalogix\Guardian;
 
-use Datalogix\Fortress\Exceptions\NoDefaultFortressSetException;
+use Datalogix\Guardian\Exceptions\NoDefaultFortressSetException;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 
 class FortressRegistry
 {
@@ -19,11 +20,11 @@ class FortressRegistry
             return;
         }
 
-        if (app()->resolved('fortress')) {
-            app('fortress')->setCurrentFortress($fortress);
+        if (app()->resolved('guardian')) {
+            app('guardian')->setCurrentFortress($fortress);
         }
 
-        app()->resolving('fortress', fn (FortressManager $manager) => $manager->setCurrentFortress($fortress));
+        app()->resolving('guardian', fn (GuardianManager $manager) => $manager->setCurrentFortress($fortress));
     }
 
     public function getDefault(): Fortress
@@ -50,10 +51,7 @@ class FortressRegistry
             return $this->fortress[$id] ?? null;
         }
 
-        $normalize = fn (string $fortressId): string => (string) str($fortressId)
-            ->lower()
-            ->replace(['-', '_'], '');
-
+        $normalize = fn (string $fortressId): string => Str::of($fortressId)->lower()->replace(['-', '_'], '')->toString();
         $fortress = [];
 
         foreach ($this->all() as $key => $fortress) {

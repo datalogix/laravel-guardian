@@ -1,15 +1,15 @@
 <?php
 
-namespace Datalogix\Fortress\Http\Middleware;
+namespace Datalogix\Guardian\Http\Middleware;
 
-use Datalogix\Fortress\Facades\Fortress;
+use Datalogix\Guardian\Guardian;
 use Illuminate\Auth\Middleware\Authenticate as BaseAuthenticate;
 
 class Authenticate extends BaseAuthenticate
 {
     protected function authenticate($request, array $guards): void
     {
-        $auth = Fortress::auth();
+        $auth = Guardian::auth();
 
         if (! $auth->check()) {
             $this->unauthenticated($request, $guards);
@@ -17,13 +17,13 @@ class Authenticate extends BaseAuthenticate
             return;
         }
 
-        $this->auth->shouldUse(Fortress::getAuthGuard());
+        $this->auth->shouldUse(Guardian::getGuard());
 
-        abort_if(Fortress::cannotAccess($auth->user()), 403);
+        abort_if(Guardian::cannotAccess($auth->user()), 403);
     }
 
     protected function redirectTo($request): ?string
     {
-        return Fortress::getLoginUrl();
+        return Guardian::getLoginUrl();
     }
 }

@@ -1,9 +1,9 @@
 <?php
 
-namespace Datalogix\Fortress\Concerns;
+namespace Datalogix\Guardian\Concerns;
 
-use Datalogix\Fortress\Http\Middleware\Authenticate;
-use Datalogix\Fortress\Http\Middleware\DispatchServingFortressEvent;
+use Datalogix\Guardian\Http\Middleware\Authenticate;
+use Datalogix\Guardian\Http\Middleware\DispatchServingGuardianEvent;
 
 trait HasModes
 {
@@ -14,22 +14,21 @@ trait HasModes
             ->default($id === 'default')
             ->login()
             ->logout()
-            ->middleware(['web', DispatchServingFortressEvent::class])
+            ->passwordReset()
+            ->passwordConfirmation()
+            ->middleware(['web', DispatchServingGuardianEvent::class])
             ->authMiddleware([Authenticate::class]);
     }
 
     public function admin(): static
     {
-        return $this->basic()
-            ->passwordReset()
-            ->prefix('/admin');
+        return $this->basic()->path('admin');
     }
 
     public function product(): static
     {
         return $this->basic()
-            ->passwordReset()
-            ->registration()
+            ->signUp()
             ->emailVerification();
     }
 }

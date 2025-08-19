@@ -1,23 +1,23 @@
 <?php
 
-namespace Datalogix\Fortress\Commands;
+namespace Datalogix\Guardian\Commands;
 
-use Datalogix\Fortress\Facades\Fortress;
+use Datalogix\Guardian\Guardian;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 
-#[AsCommand(name: 'fortress:cache-components')]
+#[AsCommand(name: 'guardian:cache-components')]
 class CacheComponentsCommand extends Command
 {
     protected $description = 'Cache all components';
 
-    protected $signature = 'fortress:cache-components';
+    protected $signature = 'guardian:cache-components';
 
     public function handle(): int
     {
         $this->info('Caching registered components...');
 
-        foreach (Fortress::getFortresses() as $fortress) {
+        foreach (Guardian::getFortresses() as $fortress) {
             $fortress->cacheComponents();
         }
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace Datalogix\Fortress\Concerns;
+namespace Datalogix\Guardian\Concerns;
 
 use Exception;
 
@@ -23,7 +23,7 @@ trait HasId
     public function getId(): string
     {
         if (! isset($this->id)) {
-            throw new Exception('A panel has been registered without an `id()`.');
+            throw new Exception('A fortress has been registered without an `id()`.');
         }
 
         return $this->id;

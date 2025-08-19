@@ -1,8 +1,8 @@
 {
-    "name": "datalogix/laravel-fortress",
+    "name": "datalogix/laravel-guardian",
     "description": "",
     "keywords": [],
-    "homepage": "https://github.com/datalogix/laravel-fortress",
+    "homepage": "https://github.com/datalogix/laravel-guardian",
     "license": "MIT",
     "type": "library",
     "authors": [
@@ -13,17 +13,34 @@
     ],
     "require": {
         "php": "^8.2",
-        "laravel/framework": "^12.0",
-        "livewire/livewire": "^3.6"
+        "illuminate/auth": "^10.0|^11.0|^12.0",
+        "illuminate/console": "^10.0|^11.0|^12.0",
+        "illuminate/contracts": "^10.0|^11.0|^12.0",
+        "illuminate/database": "^10.0|^11.0|^12.0",
+        "illuminate/filesystem": "^10.0|^11.0|^12.0",
+        "illuminate/http": "^10.0|^11.0|^12.0",
+        "illuminate/routing": "^10.0|^11.0|^12.0",
+        "illuminate/session": "^10.0|^11.0|^12.0",
+        "illuminate/support": "^10.0|^11.0|^12.0",
+        "illuminate/validation": "^10.0|^11.0|^12.0",
+        "illuminate/view": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.24",
+        "livewire/livewire": "^3.6",
+        "orchestra/testbench": "^8.0|^9.0|^10.0"
     },
     "autoload": {
+        "files": [
+            "src/helpers.php"
+        ],
         "psr-4": {
-            "Datalogix\\Fortress\\": "src/"
+            "Datalogix\\Guardian\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Datalogix\\Fortress\\Tests\\": "tests/"
+            "Datalogix\\Guardian\\Tests\\": "tests/"
         }
     },
     "scripts": {
@@ -42,7 +59,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Datalogix\\Fortress\\FortressServiceProvider"
+                "Datalogix\\Guardian\\GuardianServiceProvider"
             ]
         }
     },
@@ -50,8 +67,5 @@
         "sort-packages": true
     },
     "minimum-stability": "dev",
-    "prefer-stable": true,
-    "require-dev": {
-        "laravel/pint": "^1.24"
-    }
+    "prefer-stable": true
 }

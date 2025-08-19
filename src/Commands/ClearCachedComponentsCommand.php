@@ -1,22 +1,23 @@
 <?php
 
-namespace Datalogix\Fortress\Commands;
+namespace Datalogix\Guardian\Commands;
 
+use Datalogix\Guardian\Guardian;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 
-#[AsCommand(name: 'fortress:clear-cached-components')]
+#[AsCommand(name: 'guardian:clear-cached-components')]
 class ClearCachedComponentsCommand extends Command
 {
     protected $description = 'Clear all cached components';
 
-    protected $signature = 'fortress:clear-cached-components';
+    protected $signature = 'guardian:clear-cached-components';
 
     public function handle(): int
     {
         $this->info('Clearing cached components...');
 
-        foreach (Fortress::getFortresses() as $fortress) {
+        foreach (Guardian::getFortresses() as $fortress) {
             $fortress->clearCachedComponents();
         }
 

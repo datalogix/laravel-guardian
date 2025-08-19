@@ -1,6 +1,6 @@
 <?php
 
-namespace Datalogix\Fortress\Exceptions;
+namespace Datalogix\Guardian\Exceptions;
 
 use Exception;
 
@@ -10,7 +10,7 @@ class NoDefaultFortressSetException extends Exception
     {
         return new static('
             No default Fortress is set.
-            You may do this with the `default()` method inside a Fortress provider\'s `fortress()` configuration.
+            You may do this with the `default()` method inside a Guardian provider\'s `fortress()` configuration.
         ');
     }
 }

@@ -1,6 +1,6 @@
 <?php
 
-namespace Datalogix\Fortress\Concerns;
+namespace Datalogix\Guardian\Concerns;
 
 use Closure;
 

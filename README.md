@@ -1,7 +1,10 @@
-# Laravel Fortress
+# Laravel Guardian
 
-- Review auth pages
-- Custom login (username and/or email) - change validations too
-- Custom register fields (username and/or email) and add more fields like (company or phone number) - change validations too
+- Api to change layouts
+- Review toast message
+- Review rate limit
+- Use form build in pages
+
 - Add login socialite
+- Add inertia
 - Tenant

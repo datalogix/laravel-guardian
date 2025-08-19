@@ -1,20 +1,20 @@
 <?php
 
-namespace Datalogix\Fortress\Http\Middleware;
+namespace Datalogix\Guardian\Http\Middleware;
 
 use Closure;
-use Datalogix\Fortress\Facades\Fortress;
+use Datalogix\Guardian\Guardian;
 use Illuminate\Http\Request;
 
 class SetUpFortress
 {
     public function handle(Request $request, Closure $next, string $fortress): mixed
     {
-        $fortress = Fortress::getFortress($fortress);
+        $fortress = Guardian::getFortress($fortress);
 
-        Fortress::setCurrentFortress($fortress);
+        Guardian::setCurrentFortress($fortress);
 
-        Fortress::bootCurrentFortress();
+        Guardian::bootCurrentFortress();
 
         return $next($request);
     }

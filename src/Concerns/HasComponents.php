@@ -1,8 +1,9 @@
 <?php
 
-namespace Datalogix\Fortress\Concerns;
+namespace Datalogix\Guardian\Concerns;
 
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\Livewire;
 use Livewire\Mechanisms\ComponentRegistry;
@@ -13,11 +14,13 @@ trait HasComponents
 
     protected ?bool $hasCachedComponents = null;
 
-    public function livewireComponents(array $components): static
+    public function livewireComponents($components): static
     {
         if ($this->hasCachedComponents()) {
             return $this;
         }
+
+        $components = array_filter(is_array($components) ? $components : func_get_args());
 
         foreach ($components as $component) {
             $this->queueLivewireComponentForRegistration($component);
@@ -28,33 +31,15 @@ trait HasComponents
 
     protected function registerLivewireComponents(): void
     {
-        if (! $this->hasCachedComponents()) {
-            if ($this->hasEmailVerification() && is_subclass_of($emailVerificationRouteAction = $this->getEmailVerificationPromptRouteAction(), Component::class)) {
-                $this->queueLivewireComponentForRegistration($emailVerificationRouteAction);
-            }
-
-            if ($this->hasLogin() && is_subclass_of($loginRouteAction = $this->getLoginRouteAction(), Component::class)) {
-                $this->queueLivewireComponentForRegistration($loginRouteAction);
-            }
-
-            if ($this->hasLogout() && is_subclass_of($logoutRouteAction = $this->getLogoutRouteAction(), Component::class)) {
-                $this->queueLivewireComponentForRegistration($logoutRouteAction);
-            }
-
-            if ($this->hasPasswordReset()) {
-                if (is_subclass_of($passwordResetRequestRouteAction = $this->getPasswordResetRequestRouteAction(), Component::class)) {
-                    $this->queueLivewireComponentForRegistration($passwordResetRequestRouteAction);
-                }
-
-                if (is_subclass_of($passwordResetRouteAction = $this->getPasswordResetRouteAction(), Component::class)) {
-                    $this->queueLivewireComponentForRegistration($passwordResetRouteAction);
-                }
-            }
-
-            if ($this->hasRegistration() && is_subclass_of($registrationRouteAction = $this->getRegistrationRouteAction(), Component::class)) {
-                $this->queueLivewireComponentForRegistration($registrationRouteAction);
-            }
-        }
+        $this->livewireComponents(
+            $this->getLoginRouteAction(),
+            $this->getLogoutRouteAction(),
+            $this->getForgotPasswordRouteAction(),
+            $this->getResetPasswordRouteAction(),
+            $this->getSignUpRouteAction(),
+            $this->getPasswordConfirmationRouteAction(),
+            $this->getEmailVerificationPromptRouteAction()
+        );
 
         foreach ($this->livewireComponents as $componentName => $componentClass) {
             Livewire::component($componentName, $componentClass);
@@ -63,6 +48,10 @@ trait HasComponents
 
     protected function queueLivewireComponentForRegistration(string $component): void
     {
+        if (! is_subclass_of($component, Component::class)) {
+            return;
+        }
+
         $componentName = app(ComponentRegistry::class)->getName($component);
 
         $this->livewireComponents[$componentName] = $component;
@@ -81,7 +70,7 @@ trait HasComponents
 
         $filesystem = app(Filesystem::class);
 
-        $filesystem->ensureDirectoryExists((string) str($cachePath)->beforeLast(DIRECTORY_SEPARATOR));
+        $filesystem->ensureDirectoryExists(Str::of($cachePath)->beforeLast(DIRECTORY_SEPARATOR)->toString());
 
         $filesystem->put(
             $cachePath,
@@ -113,6 +102,6 @@ trait HasComponents
 
     public function getComponentCachePath(): string
     {
-        return (config('fortress.cache_path') ?? base_path('bootstrap/cache/fortress')).DIRECTORY_SEPARATOR."{$this->getId()}.php";
+        return (config('guardian.cache_path') ?? base_path('bootstrap/cache/guardian')).DIRECTORY_SEPARATOR."{$this->getId()}.php";
     }
 }

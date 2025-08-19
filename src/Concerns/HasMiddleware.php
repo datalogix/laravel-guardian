@@ -1,6 +1,6 @@
 <?php
 
-namespace Datalogix\Fortress\Concerns;
+namespace Datalogix\Guardian\Concerns;
 
 use Livewire\Livewire;
 
@@ -53,7 +53,7 @@ trait HasMiddleware
     public function getMiddleware(): array
     {
         return [
-            "fortress:{$this->getId()}",
+            "guardian:{$this->getId()}",
             ...$this->middleware,
         ];
     }
