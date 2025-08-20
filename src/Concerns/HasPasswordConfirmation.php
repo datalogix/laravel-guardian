@@ -4,12 +4,14 @@ namespace Datalogix\Guardian\Concerns;
 
 use Closure;
 use Datalogix\Guardian\Enums\Framework;
+use Datalogix\Guardian\Enums\Layout;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
 trait HasPasswordConfirmation
 {
     protected string|Closure|null $passwordConfirmationMiddlewareName = null;
+
     protected string|Closure|array|null $passwordConfirmationRouteAction = null;
 
     protected ?string $passwordConfirmationRouteSlug = null;
@@ -17,17 +19,19 @@ trait HasPasswordConfirmation
     protected ?string $passwordConfirmationRouteName = null;
 
     public function passwordConfirmation(
-        string|Closure|array|null $passwordConfirmationRouteAction = null,
-        ?string $passwordConfirmationRouteSlug = null,
-        ?string $passwordConfirmationRouteName = null,
-        string|Closure|null $passwordConfirmationMiddlewareName = null,
+        string|Closure|array|null $routeAction = null,
+        ?string $routeSlug = null,
+        ?string $routeName = null,
+        string|Closure|null $middlewareName = null,
+        null|string|Layout $layout = null,
     ): static {
-        $this->passwordConfirmationRouteAction = $passwordConfirmationRouteAction ?? match ($this->getFramework()) {
+        $this->passwordConfirmationRouteAction = $routeAction ?? match ($this->getFramework()) {
             Framework::Livewire => \Datalogix\Guardian\Http\Livewire\ConfirmPassword::class,
         };
-        $this->passwordConfirmationRouteSlug = $passwordConfirmationRouteSlug ?? 'confirm-password';
-        $this->passwordConfirmationRouteName = $passwordConfirmationRouteName ?? 'auth.password.confirm';
-        $this->passwordConfirmationMiddlewareName = $passwordConfirmationMiddlewareName ?? 'password.confirm';
+        $this->passwordConfirmationRouteSlug = $routeSlug ?? 'confirm-password';
+        $this->passwordConfirmationRouteName = $routeName ?? 'auth.password.confirm';
+        $this->passwordConfirmationMiddlewareName = $middlewareName ?? 'password.confirm';
+        $this->layoutForPage('confirm-password', $layout);
 
         return $this;
     }

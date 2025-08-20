@@ -11,6 +11,7 @@ class Fortress
     use Concerns\HasFramework;
     use Concerns\HasId;
     use Concerns\HasIdentifier;
+    use Concerns\HasLayouts;
     use Concerns\HasLifecycleHooks;
     use Concerns\HasLogin;
     use Concerns\HasLogout;

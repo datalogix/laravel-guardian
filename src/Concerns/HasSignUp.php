@@ -4,6 +4,7 @@ namespace Datalogix\Guardian\Concerns;
 
 use Closure;
 use Datalogix\Guardian\Enums\Framework;
+use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -17,15 +18,17 @@ trait HasSignUp
     protected ?string $signUpRouteName = null;
 
     public function signUp(
-        string|Closure|array|null $signUpRouteAction = null,
-        ?string $signUpRouteSlug = null,
-        ?string $signUpRouteName = null,
+        string|Closure|array|null $routeAction = null,
+        ?string $routeSlug = null,
+        ?string $routeName = null,
+        null|string|Layout $layout = null,
     ): static {
-        $this->signUpRouteAction = $signUpRouteAction ?? match ($this->getFramework()) {
+        $this->signUpRouteAction = $routeAction ?? match ($this->getFramework()) {
             Framework::Livewire => \Datalogix\Guardian\Http\Livewire\SignUp::class,
         };
-        $this->signUpRouteSlug = $signUpRouteSlug ?? 'sign-up';
-        $this->signUpRouteName = $signUpRouteName ?? 'auth.sign-up';
+        $this->signUpRouteSlug = $routeSlug ?? 'sign-up';
+        $this->signUpRouteName = $routeName ?? 'auth.sign-up';
+        $this->layoutForPage('sign-up', $layout);
 
         return $this;
     }

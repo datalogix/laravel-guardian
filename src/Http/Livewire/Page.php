@@ -2,12 +2,16 @@
 
 namespace Datalogix\Guardian\Http\Livewire;
 
+use Datalogix\Guardian\Enums\Layout;
+use Datalogix\Guardian\Guardian;
 use Illuminate\Support\Str;
 use Livewire\Component;
 
 abstract class Page extends Component
 {
-    protected static string $layout = 'guardian::layouts.split';
+    protected static string $layout;
+
+    protected string $pageName;
 
     public function render()
     {
@@ -15,19 +19,22 @@ abstract class Page extends Component
             ->layout($this->getLayout(), $this->getLayoutData());
     }
 
-    public function getView(): string
+    protected function getView(): string
     {
-        return $this->view ??= Str::of(static::class)
-            ->replace('Datalogix\Guardian\Http\Livewire\\', '')
+        return $this->view ??= 'guardian::'.$this->getPageName();
+    }
+
+    protected function getPageName()
+    {
+        return $this->pageName ??= Str::of(static::class)
+            ->afterLast('\\')
             ->kebab()
-            ->replace('\-', '.')
-            ->prepend('guardian::')
             ->toString();
     }
 
-    public function getLayout(): string
+    protected function getLayout(): string|Layout
     {
-        return static::$layout;
+        return static::$layout ?? Guardian::getLayoutForPage($this->getPageName());
     }
 
     protected function getViewData(): array

@@ -60,16 +60,6 @@ class GuardianManager
         $this->isCurrentFortressBooted = true;
     }
 
-    public function getGuard(): ?string
-    {
-        return $this->getCurrentFortress()?->getGuard();
-    }
-
-    public function getPasswordBroker(): ?string
-    {
-        return $this->getCurrentFortress()?->getPasswordBroker();
-    }
-
     public function getCurrentFortress(): ?Fortress
     {
         return $this->currentFortress;
@@ -90,6 +80,11 @@ class GuardianManager
         return app(FortressRegistry::class)->all();
     }
 
+    public function getGuard(): ?string
+    {
+        return $this->getCurrentFortress()?->getGuard();
+    }
+
     public function getLoginMaxAttempts(): null|int|false
     {
         return $this->getCurrentFortress()?->getLoginMaxAttempts();
@@ -108,6 +103,11 @@ class GuardianManager
     public function getEmailVerifiedMiddleware(): ?string
     {
         return $this->getCurrentFortress()?->getEmailVerifiedMiddleware();
+    }
+
+    public function getPasswordBroker(): ?string
+    {
+        return $this->getCurrentFortress()?->getPasswordBroker();
     }
 
     public function getPasswordConfirmationMiddleware(): ?string
@@ -165,14 +165,14 @@ class GuardianManager
         return $this->getCurrentFortress()?->getVerifyEmailUrl($user, $parameters);
     }
 
-    public function hasPasswordConfirmation(): ?bool
+    public function getLayout(): ?string
     {
-        return $this->getCurrentFortress()?->hasPasswordConfirmation();
+        return $this->getCurrentFortress()?->getLayout();
     }
 
-    public function hasEmailVerification(): ?bool
+    public function getLayoutForPage(string $page): ?string
     {
-        return $this->getCurrentFortress()?->hasEmailVerification();
+        return $this->getCurrentFortress()?->getLayoutForPage($page);
     }
 
     public function hasLogin(): ?bool
@@ -193,6 +193,16 @@ class GuardianManager
     public function hasSignUp(): ?bool
     {
         return $this->getCurrentFortress()?->hasSignUp();
+    }
+
+    public function hasEmailVerification(): ?bool
+    {
+        return $this->getCurrentFortress()?->hasEmailVerification();
+    }
+
+    public function hasPasswordConfirmation(): ?bool
+    {
+        return $this->getCurrentFortress()?->hasPasswordConfirmation();
     }
 
     public function isServing(): bool

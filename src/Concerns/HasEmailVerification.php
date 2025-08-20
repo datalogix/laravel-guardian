@@ -5,6 +5,7 @@ namespace Datalogix\Guardian\Concerns;
 use Closure;
 use Datalogix\Guardian\Actions\EmailVerification;
 use Datalogix\Guardian\Enums\Framework;
+use Datalogix\Guardian\Enums\Layout;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Model;
@@ -31,25 +32,29 @@ trait HasEmailVerification
     protected ?bool $isEmailVerificationRequired = null;
 
     public function emailVerification(
-        string|Closure|array|null $emailVerificationPromptRouteAction = null,
-        ?string $emailVerificationPromptRouteSlug = null,
-        ?string $emailVerificationPromptRouteName = null,
-        string|Closure|array|null $emailVerificationRouteAction = null,
-        ?string $emailVerificationRouteSlug = null,
-        ?string $emailVerificationRouteName = null,
-        string|Closure|null $emailVerifiedMiddlewareName = null,
-        ?bool $isEmailVerificationRequired = null
+        string|Closure|array|null $promptRouteAction = null,
+        ?string $promptRouteSlug = null,
+        ?string $promptRouteName = null,
+        null|string|Layout $layout = null,
+        string|Closure|array|null $routeAction = null,
+        ?string $routeSlug = null,
+        ?string $routeName = null,
+        string|Closure|null $middlewareName = null,
+        ?bool $isRequired = null,
     ): static {
-        $this->emailVerificationPromptRouteAction = $emailVerificationPromptRouteAction ?? match ($this->getFramework()) {
+        $this->emailVerificationPromptRouteAction = $promptRouteAction ?? match ($this->getFramework()) {
             Framework::Livewire => \Datalogix\Guardian\Http\Livewire\EmailVerificationPrompt::class,
         };
-        $this->emailVerificationPromptRouteSlug = $emailVerificationPromptRouteSlug ?? 'email-verification/prompt';
-        $this->emailVerificationPromptRouteName = $emailVerificationPromptRouteName ?? 'auth.email-verification.prompt';
-        $this->emailVerificationRouteAction = $emailVerificationRouteAction ?? EmailVerification::class;
-        $this->emailVerificationRouteSlug = $emailVerificationRouteSlug ?? 'email-verification/verify';
-        $this->emailVerificationRouteName = $emailVerificationRouteName ?? 'auth.email-verification.verify';
-        $this->emailVerifiedMiddlewareName = $emailVerifiedMiddlewareName ?? 'verified';
-        $this->isEmailVerificationRequired = $isEmailVerificationRequired ?? true;
+        $this->emailVerificationPromptRouteSlug = $promptRouteSlug ?? 'email-verification/prompt';
+        $this->emailVerificationPromptRouteName = $promptRouteName ?? 'auth.email-verification.prompt';
+        $this->layoutForPage('email-verification-prompt', $layout);
+
+        $this->emailVerificationRouteAction = $routeAction ?? EmailVerification::class;
+        $this->emailVerificationRouteSlug = $routeSlug ?? 'email-verification/verify';
+        $this->emailVerificationRouteName = $routeName ?? 'auth.email-verification.verify';
+
+        $this->emailVerifiedMiddlewareName = $middlewareName ?? 'verified';
+        $this->isEmailVerificationRequired = $isRequired ?? true;
 
         return $this;
     }

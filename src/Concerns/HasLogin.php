@@ -4,6 +4,7 @@ namespace Datalogix\Guardian\Concerns;
 
 use Closure;
 use Datalogix\Guardian\Enums\Framework;
+use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -19,17 +20,19 @@ trait HasLogin
     protected int|false|null $loginMaxAttempts = null;
 
     public function login(
-        string|Closure|array|null $loginRouteAction = null,
-        ?string $loginRouteSlug = null,
-        ?string $loginRouteName = null,
-        int|false|null $loginMaxAttempts = null,
+        string|Closure|array|null $routeAction = null,
+        ?string $routeSlug = null,
+        ?string $routeName = null,
+        int|false|null $maxAttempts = null,
+        null|string|Layout $layout = null,
     ): static {
-        $this->loginRouteAction = $loginRouteAction ?? match ($this->getFramework()) {
+        $this->loginRouteAction = $routeAction ?? match ($this->getFramework()) {
             Framework::Livewire => \Datalogix\Guardian\Http\Livewire\Login::class,
         };
-        $this->loginRouteSlug = $loginRouteSlug ?? 'login';
-        $this->loginRouteName = $loginRouteName ?? 'auth.login';
-        $this->loginMaxAttempts = $loginMaxAttempts;
+        $this->loginRouteSlug = $routeSlug ?? 'login';
+        $this->loginRouteName = $routeName ?? 'auth.login';
+        $this->loginMaxAttempts = $maxAttempts;
+        $this->layoutForPage('login', $layout);
 
         return $this;
     }

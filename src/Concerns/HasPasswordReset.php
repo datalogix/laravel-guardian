@@ -4,6 +4,7 @@ namespace Datalogix\Guardian\Concerns;
 
 use Closure;
 use Datalogix\Guardian\Enums\Framework;
+use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
@@ -32,20 +33,25 @@ trait HasPasswordReset
         string|Closure|array|null $forgotPasswordRouteAction = null,
         ?string $forgotPasswordRouteSlug = null,
         ?string $forgotPasswordRouteName = null,
+        null|string|Layout $forgotPasswordLayout = null,
         string|Closure|array|null $resetPasswordRouteAction = null,
         ?string $resetPasswordRouteSlug = null,
         ?string $resetPasswordRouteName = null,
+        null|string|Layout $resetPasswordLayout = null,
     ): static {
         $this->forgotPasswordRouteAction = $forgotPasswordRouteAction ?? match ($this->getFramework()) {
             Framework::Livewire => \Datalogix\Guardian\Http\Livewire\ForgotPassword::class,
         };
         $this->forgotPasswordRouteSlug = $forgotPasswordRouteSlug ?? 'forgot-password';
         $this->forgotPasswordRouteName = $forgotPasswordRouteName ?? 'auth.password.request';
+        $this->layoutForPage('forgot-password', $forgotPasswordLayout);
+
         $this->resetPasswordRouteAction = $resetPasswordRouteAction ?? match ($this->getFramework()) {
             Framework::Livewire => \Datalogix\Guardian\Http\Livewire\ResetPassword::class,
         };
         $this->resetPasswordRouteSlug = $resetPasswordRouteSlug ?? 'reset-password';
         $this->resetPasswordRouteName = $resetPasswordRouteName ?? 'auth.password.reset';
+        $this->layoutForPage('reset-password', $resetPasswordLayout);
 
         return $this;
     }
