@@ -6,6 +6,7 @@ use Closure;
 use Datalogix\Guardian\Enums\Framework;
 use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
+use Datalogix\Guardian\Http\Responses\ResetPasswordResponse;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +28,8 @@ trait HasPasswordReset
 
     protected ?string $resetPasswordRouteName = null;
 
+    protected string|Closure|null $resetPasswordResponse = null;
+
     protected ?string $passwordBroker = null;
 
     public function passwordReset(
@@ -37,6 +40,7 @@ trait HasPasswordReset
         string|Closure|array|null $resetPasswordRouteAction = null,
         ?string $resetPasswordRouteSlug = null,
         ?string $resetPasswordRouteName = null,
+        string|Closure|null $resetPasswordResponse = null,
         null|string|Layout $resetPasswordLayout = null,
     ): static {
         $this->forgotPasswordRouteAction = $forgotPasswordRouteAction ?? match ($this->getFramework()) {
@@ -51,6 +55,7 @@ trait HasPasswordReset
         };
         $this->resetPasswordRouteSlug = $resetPasswordRouteSlug ?? 'reset-password';
         $this->resetPasswordRouteName = $resetPasswordRouteName ?? 'auth.password.reset';
+        $this->resetPasswordResponse = $resetPasswordResponse ?? ResetPasswordResponse::class;
         $this->layoutForPage('reset-password', $resetPasswordLayout);
 
         return $this;
@@ -110,6 +115,11 @@ trait HasPasswordReset
     public function getResetPasswordRouteName(): ?string
     {
         return $this->resetPasswordRouteName;
+    }
+
+    public function getResetPasswordResponse()
+    {
+        return value($this->resetPasswordResponse);
     }
 
     public function getPasswordBroker(): ?string

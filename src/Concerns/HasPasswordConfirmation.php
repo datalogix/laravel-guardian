@@ -5,6 +5,7 @@ namespace Datalogix\Guardian\Concerns;
 use Closure;
 use Datalogix\Guardian\Enums\Framework;
 use Datalogix\Guardian\Enums\Layout;
+use Datalogix\Guardian\Http\Responses\PasswordConfirmationResponse;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
@@ -18,10 +19,13 @@ trait HasPasswordConfirmation
 
     protected ?string $passwordConfirmationRouteName = null;
 
+    protected string|Closure|null $passwordConfirmationResponse = null;
+
     public function passwordConfirmation(
         string|Closure|array|null $routeAction = null,
         ?string $routeSlug = null,
         ?string $routeName = null,
+        string|Closure|null $response = null,
         string|Closure|null $middlewareName = null,
         null|string|Layout $layout = null,
     ): static {
@@ -30,7 +34,9 @@ trait HasPasswordConfirmation
         };
         $this->passwordConfirmationRouteSlug = $routeSlug ?? 'confirm-password';
         $this->passwordConfirmationRouteName = $routeName ?? 'auth.password.confirm';
+        $this->passwordConfirmationResponse = $response ?? PasswordConfirmationResponse::class;
         $this->passwordConfirmationMiddlewareName = $middlewareName ?? 'password.confirm';
+
         $this->layoutForPage('confirm-password', $layout);
 
         return $this;
@@ -56,6 +62,11 @@ trait HasPasswordConfirmation
     public function getPasswordConfirmationRouteName(): ?string
     {
         return $this->passwordConfirmationRouteName;
+    }
+
+    public function getPasswordConfirmationResponse()
+    {
+        return value($this->passwordConfirmationResponse);
     }
 
     public function hasPasswordConfirmation(): bool

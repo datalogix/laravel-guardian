@@ -6,6 +6,7 @@ use Closure;
 use Datalogix\Guardian\Enums\Framework;
 use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
+use Datalogix\Guardian\Http\Responses\SignUpResponse;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
@@ -17,10 +18,13 @@ trait HasSignUp
 
     protected ?string $signUpRouteName = null;
 
+    protected string|Closure|null $signUpResponse = null;
+
     public function signUp(
         string|Closure|array|null $routeAction = null,
         ?string $routeSlug = null,
         ?string $routeName = null,
+        string|Closure|null $response = null,
         null|string|Layout $layout = null,
     ): static {
         $this->signUpRouteAction = $routeAction ?? match ($this->getFramework()) {
@@ -28,6 +32,7 @@ trait HasSignUp
         };
         $this->signUpRouteSlug = $routeSlug ?? 'sign-up';
         $this->signUpRouteName = $routeName ?? 'auth.sign-up';
+        $this->signUpResponse = $response ?? SignUpResponse::class;
         $this->layoutForPage('sign-up', $layout);
 
         return $this;
@@ -53,6 +58,11 @@ trait HasSignUp
     public function getSignUpRouteName(): ?string
     {
         return $this->signUpRouteName;
+    }
+
+    public function getSignUpResponse()
+    {
+        return value($this->signUpResponse);
     }
 
     public function hasSignUp(): bool

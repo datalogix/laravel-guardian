@@ -47,7 +47,7 @@ class ResetPassword
 
         Session::flash('status', __($status));
 
-        return Guardian::redirect(Guardian::hasLogin() ? Guardian::getLoginUrl() : null);
+        return app(Guardian::getResetPasswordResponse());
     }
 
     public static function rules(): array

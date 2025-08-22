@@ -4,6 +4,7 @@ namespace Datalogix\Guardian\Concerns;
 
 use Closure;
 use Datalogix\Guardian\Actions\Logout;
+use Datalogix\Guardian\Http\Responses\LogoutResponse;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
@@ -15,14 +16,18 @@ trait HasLogout
 
     protected ?string $logoutRouteName = null;
 
+    protected string|Closure|null $logoutResponse = null;
+
     public function logout(
-        string|Closure|array|null $logoutRouteAction = null,
-        ?string $logoutRouteSlug = null,
-        ?string $logoutRouteName = null,
+        string|Closure|array|null $routeAction = null,
+        ?string $routeSlug = null,
+        ?string $routeName = null,
+        string|Closure|null $response = null,
     ): static {
-        $this->logoutRouteAction = $logoutRouteAction ?? Logout::class;
-        $this->logoutRouteSlug = $logoutRouteSlug ?? 'logout';
-        $this->logoutRouteName = $logoutRouteName ?? 'auth.logout';
+        $this->logoutRouteAction = $routeAction ?? Logout::class;
+        $this->logoutRouteSlug = $routeSlug ?? 'logout';
+        $this->logoutRouteName = $routeName ?? 'auth.logout';
+        $this->logoutResponse = $response ?? LogoutResponse::class;
 
         return $this;
     }
@@ -47,6 +52,11 @@ trait HasLogout
     public function getLogoutRouteName(): ?string
     {
         return $this->logoutRouteName;
+    }
+
+    public function getLogoutResponse()
+    {
+        return value($this->logoutResponse);
     }
 
     public function hasLogout(): bool

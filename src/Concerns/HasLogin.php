@@ -6,6 +6,7 @@ use Closure;
 use Datalogix\Guardian\Enums\Framework;
 use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
+use Datalogix\Guardian\Http\Responses\LoginResponse;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
@@ -19,10 +20,13 @@ trait HasLogin
 
     protected int|false|null $loginMaxAttempts = null;
 
+    protected string|Closure|null $loginResponse = null;
+
     public function login(
         string|Closure|array|null $routeAction = null,
         ?string $routeSlug = null,
         ?string $routeName = null,
+        string|Closure|null $response = null,
         int|false|null $maxAttempts = null,
         null|string|Layout $layout = null,
     ): static {
@@ -31,6 +35,7 @@ trait HasLogin
         };
         $this->loginRouteSlug = $routeSlug ?? 'login';
         $this->loginRouteName = $routeName ?? 'auth.login';
+        $this->loginResponse = $response ?? LoginResponse::class;
         $this->loginMaxAttempts = $maxAttempts;
         $this->layoutForPage('login', $layout);
 
@@ -57,6 +62,11 @@ trait HasLogin
     public function getLoginRouteName(): ?string
     {
         return $this->loginRouteName;
+    }
+
+    public function getLoginResponse()
+    {
+        return value($this->loginResponse);
     }
 
     public function getLoginMaxAttempts(): int|false|null

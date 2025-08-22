@@ -14,6 +14,6 @@ class Logout
         Session::invalidate();
         Session::regenerateToken();
 
-        return Guardian::redirect(Guardian::hasLogin() ? Guardian::getLoginUrl() : null);
+        return app(Guardian::getLogoutResponse());
     }
 }

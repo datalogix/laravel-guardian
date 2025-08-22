@@ -39,7 +39,7 @@ class Login
         RateLimiter::clear($throttleKey);
         Session::regenerate();
 
-        return Guardian::redirect(intended: true);
+        return app(Guardian::getLoginResponse());
     }
 
     protected function parseCredentials(array $data = []): array

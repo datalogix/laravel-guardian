@@ -115,7 +115,7 @@ trait HasRoutes
 
     public function getHomeUrl(): ?string
     {
-        return value($this->homeUrl);
+        return value($this->homeUrl) ?? $this->getUrl();
     }
 
     public function getDomains(): array

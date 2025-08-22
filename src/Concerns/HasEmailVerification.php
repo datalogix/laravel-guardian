@@ -6,6 +6,7 @@ use Closure;
 use Datalogix\Guardian\Actions\EmailVerification;
 use Datalogix\Guardian\Enums\Framework;
 use Datalogix\Guardian\Enums\Layout;
+use Datalogix\Guardian\Http\Responses\EmailVerificationResponse;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Model;
@@ -29,6 +30,8 @@ trait HasEmailVerification
 
     protected ?string $emailVerificationRouteName = null;
 
+    protected string|Closure|null $emailVerificationResponse = null;
+
     protected ?bool $isEmailVerificationRequired = null;
 
     public function emailVerification(
@@ -39,6 +42,7 @@ trait HasEmailVerification
         string|Closure|array|null $routeAction = null,
         ?string $routeSlug = null,
         ?string $routeName = null,
+        string|Closure|null $response = null,
         string|Closure|null $middlewareName = null,
         ?bool $isRequired = null,
     ): static {
@@ -52,6 +56,7 @@ trait HasEmailVerification
         $this->emailVerificationRouteAction = $routeAction ?? EmailVerification::class;
         $this->emailVerificationRouteSlug = $routeSlug ?? 'email-verification/verify';
         $this->emailVerificationRouteName = $routeName ?? 'auth.email-verification.verify';
+        $this->emailVerificationResponse = $response ?? EmailVerificationResponse::class;
 
         $this->emailVerifiedMiddlewareName = $middlewareName ?? 'verified';
         $this->isEmailVerificationRequired = $isRequired ?? true;
@@ -109,6 +114,11 @@ trait HasEmailVerification
     public function getEmailVerificationRouteName(): ?string
     {
         return $this->emailVerificationRouteName;
+    }
+
+    public function getEmailVerificationResponse()
+    {
+        return value($this->emailVerificationResponse);
     }
 
     public function getEmailVerifiedMiddlewareName(): ?string

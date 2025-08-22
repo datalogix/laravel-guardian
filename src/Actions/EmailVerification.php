@@ -11,6 +11,6 @@ class EmailVerification
     {
         $request->fulfill();
 
-        return Guardian::redirect(intended: true);
+        return app(Guardian::getEmailVerificationResponse());
     }
 }

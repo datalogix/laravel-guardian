@@ -20,7 +20,7 @@ class ConfirmPassword
 
         Session::put('auth.password_confirmed_at', time());
 
-        return Guardian::redirect(intended: true);
+        return app(Guardian::getPasswordConfirmationResponse());
     }
 
     public static function rules(): array

@@ -27,7 +27,7 @@ class SignUp
 
         Session::regenerate();
 
-        return Guardian::redirect(intended: true);
+        return app(Guardian::getSignUpResponse());
     }
 
     public static function rules(): array
