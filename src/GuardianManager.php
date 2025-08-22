@@ -210,6 +210,11 @@ class GuardianManager
         return $this->getCurrentOrDefaultFortress()->hasPasswordConfirmation();
     }
 
+    public function wrapInDatabaseTransaction(Closure $callback): mixed
+    {
+        return $this->getCurrentOrDefaultFortress()->wrapInDatabaseTransaction($callback);
+    }
+
     public function isServing(): bool
     {
         return $this->isServing;

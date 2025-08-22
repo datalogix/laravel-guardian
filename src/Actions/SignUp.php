@@ -7,6 +7,7 @@ use Datalogix\Guardian\Guardian;
 use Illuminate\Auth\EloquentUserProvider;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\SessionGuard;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -16,7 +17,7 @@ class SignUp
 
     public function __invoke(array $data = [])
     {
-        $user = static::getUserModel()::create($data);
+        $user = Guardian::wrapInDatabaseTransaction(fn () => static::getUserModel()::create($data));
 
         event(new Registered($user));
 
@@ -24,7 +25,7 @@ class SignUp
 
         Guardian::auth()->login($user);
 
-        session()->regenerate();
+        Session::regenerate();
 
         return Guardian::redirect(intended: true);
     }
