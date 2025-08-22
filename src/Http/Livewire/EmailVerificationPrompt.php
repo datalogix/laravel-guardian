@@ -15,10 +15,11 @@ class EmailVerificationPrompt extends Page
         }
     }
 
-    public function resend()
+    public function submit()
     {
         $result = app(SendEmailVerificationNotification::class)(Guardian::user());
 
         Session::flash('status', $result ? 'Verification link sent!' : 'Failed to send verification link. Please try again later.');
+        Session::flash('status_type', $result ? 'success' : 'danger');
     }
 }
