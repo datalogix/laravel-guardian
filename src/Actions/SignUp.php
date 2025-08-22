@@ -37,6 +37,7 @@ class SignUp
             'email' => ['required', 'string', 'email', 'max:255', Rule::unique(static::getUserModel())],
             'password' => ['required', 'string', Password::default(), 'confirmed'],
             'password_confirmation' => ['required', 'string', Password::default()],
+            'terms' => ['required', 'accepted'],
         ];
 
         if (Guardian::getIdentifierKey() !== IdentifierKey::Email) {

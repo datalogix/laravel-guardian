@@ -22,6 +22,8 @@ class SignUp extends Page
 
     public string $password_confirmation = '';
 
+    public bool $terms = false;
+
     public function mount()
     {
         $this->identifierKey = Guardian::getIdentifierKey();
