@@ -22,7 +22,7 @@ class SignUp
 
         app(SendEmailVerificationNotification::class)($user);
 
-        Guardian::auth()->login($user, true);
+        Guardian::auth()->login($user);
 
         session()->regenerate();
 
