@@ -31,22 +31,22 @@ class GuardianManager
 
     public function auth(): Guard|StatefulGuard
     {
-        return $this->getCurrentFortress()?->auth();
+        return $this->getCurrentOrDefaultFortress()->auth();
     }
 
     public function user(): ?Authenticatable
     {
-        return $this->getCurrentFortress()?->user();
+        return $this->getCurrentOrDefaultFortress()->user();
     }
 
-    public function canAccess(Model $user): ?bool
+    public function canAccess(Model $user): bool
     {
-        return $this->getCurrentFortress()?->canAccess($user);
+        return $this->getCurrentOrDefaultFortress()->canAccess($user);
     }
 
-    public function cannotAccess(Model $user): ?bool
+    public function cannotAccess(Model $user): bool
     {
-        return $this->getCurrentFortress()?->cannotAccess($user);
+        return $this->getCurrentOrDefaultFortress()->cannotAccess($user);
     }
 
     public function bootCurrentFortress(): void
@@ -55,9 +55,14 @@ class GuardianManager
             return;
         }
 
-        $this->getCurrentFortress()?->boot();
+        $this->getCurrentOrDefaultFortress()->boot();
 
         $this->isCurrentFortressBooted = true;
+    }
+
+    public function getCurrentOrDefaultFortress(): Fortress
+    {
+        return $this->getCurrentFortress() ?? $this->getDefaultFortress();
     }
 
     public function getCurrentFortress(): ?Fortress
@@ -80,129 +85,129 @@ class GuardianManager
         return app(FortressRegistry::class)->all();
     }
 
-    public function getGuard(): ?string
+    public function getGuard(): string
     {
-        return $this->getCurrentFortress()?->getGuard();
+        return $this->getCurrentOrDefaultFortress()->getGuard();
     }
 
     public function getLoginMaxAttempts(): null|int|false
     {
-        return $this->getCurrentFortress()?->getLoginMaxAttempts();
+        return $this->getCurrentOrDefaultFortress()->getLoginMaxAttempts();
     }
 
-    public function getIdentifierKey(): ?IdentifierKey
+    public function getIdentifierKey(): IdentifierKey
     {
-        return $this->getCurrentFortress()?->getIdentifierKey();
+        return $this->getCurrentOrDefaultFortress()->getIdentifierKey();
     }
 
     public function getEmailVerificationPromptUrl(array $parameters = []): ?string
     {
-        return $this->getCurrentFortress()?->getEmailVerificationPromptUrl($parameters);
+        return $this->getCurrentOrDefaultFortress()->getEmailVerificationPromptUrl($parameters);
     }
 
     public function getEmailVerifiedMiddleware(): ?string
     {
-        return $this->getCurrentFortress()?->getEmailVerifiedMiddleware();
+        return $this->getCurrentOrDefaultFortress()->getEmailVerifiedMiddleware();
     }
 
     public function getPasswordBroker(): ?string
     {
-        return $this->getCurrentFortress()?->getPasswordBroker();
+        return $this->getCurrentOrDefaultFortress()->getPasswordBroker();
     }
 
     public function getPasswordConfirmationMiddleware(): ?string
     {
-        return $this->getCurrentFortress()?->getPasswordConfirmationMiddleware();
+        return $this->getCurrentOrDefaultFortress()->getPasswordConfirmationMiddleware();
     }
 
     public function redirect(?string $path = null, bool $intended = false, bool $navigate = true)
     {
-        return $this->getCurrentFortress()?->redirect($path, $intended, $navigate);
+        return $this->getCurrentOrDefaultFortress()->redirect($path, $intended, $navigate);
     }
 
     public function getHomeUrl(): ?string
     {
-        return $this->getCurrentFortress()?->getHomeUrl() ?? $this->getCurrentFortress()?->getUrl();
+        return $this->getCurrentOrDefaultFortress()->getHomeUrl() ?? $this->getCurrentOrDefaultFortress()->getUrl();
     }
 
-    public function getId(): ?string
+    public function getId(): string
     {
-        return $this->getCurrentFortress()?->getId();
+        return $this->getCurrentOrDefaultFortress()->getId();
     }
 
     public function getLoginUrl(array $parameters = []): ?string
     {
-        return $this->getCurrentFortress()?->getLoginUrl($parameters);
+        return $this->getCurrentOrDefaultFortress()->getLoginUrl($parameters);
     }
 
-    public function getLogoutUrl(array $parameters = []): string
+    public function getLogoutUrl(array $parameters = []): ?string
     {
-        return $this->getCurrentFortress()?->getLogoutUrl($parameters);
+        return $this->getCurrentOrDefaultFortress()->getLogoutUrl($parameters);
     }
 
     public function getForgotPasswordUrl(array $parameters = []): ?string
     {
-        return $this->getCurrentFortress()?->getForgotPasswordUrl($parameters);
+        return $this->getCurrentOrDefaultFortress()->getForgotPasswordUrl($parameters);
     }
 
     public function getResetPasswordUrl(string $token, CanResetPassword|Model|Authenticatable $user, array $parameters = []): ?string
     {
-        return $this->getCurrentFortress()?->getResetPasswordUrl($token, $user, $parameters);
+        return $this->getCurrentOrDefaultFortress()->getResetPasswordUrl($token, $user, $parameters);
     }
 
     public function getSignUpUrl(array $parameters = []): ?string
     {
-        return $this->getCurrentFortress()?->getSignUpUrl($parameters);
+        return $this->getCurrentOrDefaultFortress()->getSignUpUrl($parameters);
     }
 
     public function getUrl(): ?string
     {
-        return $this->getCurrentFortress()?->getUrl();
+        return $this->getCurrentOrDefaultFortress()->getUrl();
     }
 
-    public function getVerifyEmailUrl(MustVerifyEmail|Model|Authenticatable $user, array $parameters = []): ?string
+    public function getVerifyEmailUrl(MustVerifyEmail|Model|Authenticatable $user, array $parameters = []): string
     {
-        return $this->getCurrentFortress()?->getVerifyEmailUrl($user, $parameters);
+        return $this->getCurrentOrDefaultFortress()->getVerifyEmailUrl($user, $parameters);
     }
 
-    public function getLayout(): ?string
+    public function getLayout(): string
     {
-        return $this->getCurrentFortress()?->getLayout();
+        return $this->getCurrentOrDefaultFortress()->getLayout();
     }
 
-    public function getLayoutForPage(string $page): ?string
+    public function getLayoutForPage(string $page): string
     {
-        return $this->getCurrentFortress()?->getLayoutForPage($page);
+        return $this->getCurrentOrDefaultFortress()->getLayoutForPage($page);
     }
 
-    public function hasLogin(): ?bool
+    public function hasLogin(): bool
     {
-        return $this->getCurrentFortress()?->hasLogin();
+        return $this->getCurrentOrDefaultFortress()->hasLogin();
     }
 
-    public function hasLogout(): ?bool
+    public function hasLogout(): bool
     {
-        return $this->getCurrentFortress()?->hasLogout();
+        return $this->getCurrentOrDefaultFortress()->hasLogout();
     }
 
-    public function hasPasswordReset(): ?bool
+    public function hasPasswordReset(): bool
     {
-        return $this->getCurrentFortress()?->hasPasswordReset();
+        return $this->getCurrentOrDefaultFortress()->hasPasswordReset();
     }
 
-    public function hasSignUp(): ?bool
+    public function hasSignUp(): bool
     {
-        return $this->getCurrentFortress()?->hasSignUp();
+        return $this->getCurrentOrDefaultFortress()->hasSignUp();
     }
 
-    public function hasEmailVerification(): ?bool
+    public function hasEmailVerification(): bool
     {
-        return $this->getCurrentFortress()?->hasEmailVerification();
+        return $this->getCurrentOrDefaultFortress()->hasEmailVerification();
     }
 
-    public function hasPasswordConfirmation(): ?bool
+    public function hasPasswordConfirmation(): bool
     {
-        return $this->getCurrentFortress()?->hasPasswordConfirmation();
+        return $this->getCurrentOrDefaultFortress()->hasPasswordConfirmation();
     }
 
     public function isServing(): bool

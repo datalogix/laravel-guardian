@@ -10,6 +10,8 @@ class FortressRegistry
 {
     protected array $fortress = [];
 
+    public ?Fortress $defaultFortress = null;
+
     public function register(Fortress $fortress): void
     {
         $this->fortress[$fortress->getId()] = $fortress;
@@ -29,7 +31,7 @@ class FortressRegistry
 
     public function getDefault(): Fortress
     {
-        return Arr::first(
+        return $this->defaultFortress ??= Arr::first(
             $this->all(),
             fn (Fortress $fortress): bool => $fortress->isDefault(),
             fn () => throw NoDefaultFortressSetException::make(),
