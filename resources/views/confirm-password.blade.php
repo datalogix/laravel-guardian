@@ -1,1 +1,1 @@
-<tk:auth.pages.confirm-password />
+<tk:pages.auth.confirm-password />

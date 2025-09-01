@@ -1,5 +1,9 @@
 <tk:html>
-    <tk:auth.layouts.split>
+    <tk:layouts.auth>
+        <x-slot:hero>
+            &nbsp;
+        </x-slot:hero>
+
         {{ $slot }}
-    </tk:auth.layouts.split>
+    </tk:layouts.auth>
 </tk:html>

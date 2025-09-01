@@ -2,7 +2,7 @@
 use Datalogix\Guardian\Enums\IdentifierKey;
 @endphp
 
-<tk:auth.pages.login
+<tk:pages.auth.login
     email:name="login"
     email:type="{{ match($identifierKey) {
         IdentifierKey::Email => 'email',

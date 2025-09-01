@@ -1,5 +1,5 @@
 <tk:html>
-    <tk:auth.layouts.simple>
+    <tk:layouts.auth :bg="false">
         {{ $slot }}
-    </tk:auth.layouts.simple>
+    </tk:layouts.auth>
 </tk:html>
