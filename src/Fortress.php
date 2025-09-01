@@ -6,7 +6,7 @@ class Fortress
 {
     use Concerns\HasAuth;
     use Concerns\HasComponents;
-    use Concerns\hasDatabaseTransactions;
+    use Concerns\HasDatabaseTransactions;
     use Concerns\HasDefault;
     use Concerns\HasEmailVerification;
     use Concerns\HasFramework;
