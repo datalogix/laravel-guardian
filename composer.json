@@ -26,9 +26,10 @@
         "illuminate/view": "^10.0|^11.0|^12.0"
     },
     "require-dev": {
-        "laravel/pint": "^1.24",
+        "graham-campbell/testbench": "^6.2",
+        "laravel/pint": "^1.25",
         "livewire/livewire": "^3.6",
-        "orchestra/testbench": "^8.0|^9.0|^10.0"
+        "phpunit/phpunit": "^10.5|^11.0"
     },
     "autoload": {
         "files": [
@@ -44,16 +45,7 @@
         }
     },
     "scripts": {
-        "dev": [
-            "@composer update",
-            "@composer test",
-            "pnpm install",
-            "pnpm dev"
-        ],
-        "lint": [
-            "@php pint",
-            "pnpm lint"
-        ],
+        "lint": "vendor/bin/pint",
         "test": "vendor/bin/phpunit"
     },
     "extra": {
