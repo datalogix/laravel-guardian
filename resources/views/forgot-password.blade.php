@@ -1,3 +1,3 @@
-<tk:pages.auth.forgot-password
+<tk:page.auth.forgot-password
     :login="guardian()->getLoginUrl()"
 />

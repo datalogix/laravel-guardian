@@ -1,1 +1,1 @@
-<tk:pages.auth.reset-password />
+<tk:page.auth.reset-password />

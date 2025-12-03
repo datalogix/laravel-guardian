@@ -1,3 +1,3 @@
-<tk:pages.auth.verify-email
+<tk:page.auth.verify-email
     :logout="guardian()->getLogoutUrl()"
 />
