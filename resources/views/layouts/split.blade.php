@@ -1,9 +1,9 @@
 <tk:html>
-    <tk:layouts.auth>
+    <tk:layout.auth>
         <x-slot:hero>
             &nbsp;
         </x-slot:hero>
 
         {{ $slot }}
-    </tk:layouts.auth>
+    </tk:layout.auth>
 </tk:html>
