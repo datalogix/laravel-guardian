@@ -3,10 +3,11 @@
 namespace Datalogix\Guardian\Concerns;
 
 use Closure;
-use Datalogix\Guardian\Actions\EmailVerification;
 use Datalogix\Guardian\Enums\Framework;
 use Datalogix\Guardian\Enums\Layout;
-use Datalogix\Guardian\Http\Responses\EmailVerificationResponse;
+use Datalogix\Guardian\Http\Controllers\EmailVerificationController;
+use Datalogix\Guardian\Http\Responses\EmailVerificationPromptResponse;
+use Datalogix\Guardian\Http\Responses\EmailVerificationVerifyResponse;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Model;
@@ -16,77 +17,63 @@ use Illuminate\Support\Str;
 
 trait HasEmailVerification
 {
-    protected string|Closure|null $emailVerifiedMiddlewareName = null;
-
-    protected string|Closure|array|null $emailVerificationPromptRouteAction = null;
+    protected string|Closure|array|false|null $emailVerificationPromptRouteAction = null;
 
     protected ?string $emailVerificationPromptRouteSlug = null;
 
     protected ?string $emailVerificationPromptRouteName = null;
 
-    protected string|Closure|array|null $emailVerificationRouteAction = null;
+    protected string|Closure|null $emailVerificationPromptResponse = null;
 
-    protected ?string $emailVerificationRouteSlug = null;
+    protected string|Closure|array|false|null $emailVerificationVerifyRouteAction = null;
 
-    protected ?string $emailVerificationRouteName = null;
+    protected ?string $emailVerificationVerifyRouteSlug = null;
 
-    protected string|Closure|null $emailVerificationResponse = null;
+    protected ?string $emailVerificationVerifyRouteName = null;
 
-    protected ?bool $isEmailVerificationRequired = null;
+    protected string|Closure|null $emailVerificationVerifyResponse = null;
+
+    protected string|Closure|null $emailVerifiedMiddlewareName = null;
+
+    protected int|false|null $emailVerificationMaxAttempts = null;
+
+    protected ?bool $emailVerificationIsRequired = null;
 
     public function emailVerification(
-        string|Closure|array|null $promptRouteAction = null,
+        string|Closure|array|false|null $promptRouteAction = null,
         ?string $promptRouteSlug = null,
         ?string $promptRouteName = null,
-        null|string|Layout $layout = null,
-        string|Closure|array|null $routeAction = null,
-        ?string $routeSlug = null,
-        ?string $routeName = null,
-        string|Closure|null $response = null,
+        string|Closure|null $promptResponse = null,
+        Layout|string|null $promptLayout = null,
+        string|Closure|array|false|null $verifyRouteAction = null,
+        ?string $verifyRouteSlug = null,
+        ?string $verifyRouteName = null,
+        string|Closure|null $verifyResponse = null,
         string|Closure|null $middlewareName = null,
         ?bool $isRequired = null,
+        int|false|null $maxAttempts = null,
     ): static {
         $this->emailVerificationPromptRouteAction = $promptRouteAction ?? match ($this->getFramework()) {
             Framework::Livewire => \Datalogix\Guardian\Http\Livewire\EmailVerificationPrompt::class,
         };
         $this->emailVerificationPromptRouteSlug = $promptRouteSlug ?? 'email-verification/prompt';
         $this->emailVerificationPromptRouteName = $promptRouteName ?? 'auth.email-verification.prompt';
-        $this->layoutForPage('email-verification-prompt', $layout);
+        $this->emailVerificationPromptResponse = $promptResponse ?? EmailVerificationPromptResponse::class;
+        $this->layoutForPage('email-verification-prompt', $promptLayout);
 
-        $this->emailVerificationRouteAction = $routeAction ?? EmailVerification::class;
-        $this->emailVerificationRouteSlug = $routeSlug ?? 'email-verification/verify';
-        $this->emailVerificationRouteName = $routeName ?? 'auth.email-verification.verify';
-        $this->emailVerificationResponse = $response ?? EmailVerificationResponse::class;
+        $this->emailVerificationVerifyRouteAction = $verifyRouteAction ?? EmailVerificationController::class;
+        $this->emailVerificationVerifyRouteSlug = $verifyRouteSlug ?? 'email-verification/verify';
+        $this->emailVerificationVerifyRouteName = $verifyRouteName ?? 'auth.email-verification.verify';
+        $this->emailVerificationVerifyResponse = $verifyResponse ?? EmailVerificationVerifyResponse::class;
 
         $this->emailVerifiedMiddlewareName = $middlewareName ?? 'verified';
-        $this->isEmailVerificationRequired = $isRequired ?? true;
+        $this->emailVerificationIsRequired = $isRequired ?? true;
+        $this->emailVerificationMaxAttempts = $maxAttempts ?? 5;
 
         return $this;
     }
 
-    public function getEmailVerificationPromptUrl(array $parameters = []): ?string
-    {
-        if (! $this->hasEmailVerification()) {
-            return null;
-        }
-
-        return route($this->getEmailVerificationPromptRouteName(), $parameters);
-    }
-
-    public function getVerifyEmailUrl(MustVerifyEmail|Model|Authenticatable $user, array $parameters = []): string
-    {
-        return URL::temporarySignedRoute(
-            $this->generateRouteName($this->getEmailVerificationRouteName()),
-            now()->addMinutes(config('auth.verification.expire', 60)),
-            [
-                'id' => $user->getKey(),
-                'hash' => sha1($user->getEmailForVerification()),
-                ...$parameters,
-            ],
-        );
-    }
-
-    public function getEmailVerificationPromptRouteAction(): string|Closure|array|null
+    public function getEmailVerificationPromptRouteAction(): string|Closure|array|false|null
     {
         return $this->emailVerificationPromptRouteAction;
     }
@@ -101,29 +88,66 @@ trait HasEmailVerification
         return $this->emailVerificationPromptRouteName;
     }
 
-    public function getEmailVerificationRouteAction(): string|Closure|array|null
+    public function getEmailVerificationPromptResponse()
     {
-        return $this->emailVerificationRouteAction;
+        return value($this->emailVerificationPromptResponse);
     }
 
-    public function getEmailVerificationRouteSlug(string $suffix): string
+    public function getEmailVerificationVerifyRouteAction(): string|Closure|array|false|null
     {
-        return Str::start($this->emailVerificationRouteSlug, '/').$suffix;
+        return $this->emailVerificationVerifyRouteAction;
     }
 
-    public function getEmailVerificationRouteName(): ?string
+    public function getEmailVerificationVerifyRouteSlug(string $suffix): string
     {
-        return $this->emailVerificationRouteName;
+        return Str::start($this->emailVerificationVerifyRouteSlug, '/').$suffix;
     }
 
-    public function getEmailVerificationResponse()
+    public function getEmailVerificationVerifyRouteName(): ?string
     {
-        return value($this->emailVerificationResponse);
+        return $this->emailVerificationVerifyRouteName;
+    }
+
+    public function getEmailVerificationVerifyResponse()
+    {
+        return value($this->emailVerificationVerifyResponse);
     }
 
     public function getEmailVerifiedMiddlewareName(): ?string
     {
         return value($this->emailVerifiedMiddlewareName);
+    }
+
+    public function isEmailVerificationRequired(): ?bool
+    {
+        return $this->emailVerificationIsRequired;
+    }
+
+    public function getEmailVerificationMaxAttempts(): int|false|null
+    {
+        return $this->emailVerificationMaxAttempts;
+    }
+
+    public function getEmailVerificationPromptUrl(array $parameters = []): ?string
+    {
+        if (! $this->hasEmailVerification()) {
+            return null;
+        }
+
+        return route($this->getEmailVerificationPromptRouteName(), $parameters);
+    }
+
+    public function getVerifyEmailUrl(MustVerifyEmail|Model|Authenticatable $user, array $parameters = []): string
+    {
+        return URL::temporarySignedRoute(
+            $this->generateRouteName($this->getEmailVerificationVerifyRouteName()),
+            now()->addMinutes(config('auth.verification.expire', 60)),
+            [
+                'id' => $user->getKey(),
+                'hash' => sha1($user->getEmailForVerification()),
+                ...$parameters,
+            ],
+        );
     }
 
     public function getEmailVerifiedMiddleware(): ?string
@@ -133,14 +157,9 @@ trait HasEmailVerification
             : null;
     }
 
-    public function isEmailVerificationRequired(): ?bool
-    {
-        return $this->isEmailVerificationRequired;
-    }
-
     public function hasEmailVerification(): bool
     {
-        return filled($this->getEmailVerificationPromptRouteAction()) && filled($this->getEmailVerificationRouteAction());
+        return filled($this->getEmailVerificationPromptRouteAction()) && filled($this->getEmailVerificationVerifyRouteAction());
     }
 
     public function emailVerificationRoutes(): static
@@ -150,9 +169,9 @@ trait HasEmailVerification
                 Route::get($this->getEmailVerificationPromptRouteSlug(), $this->getEmailVerificationPromptRouteAction())
                     ->name($this->getEmailVerificationPromptRouteName());
 
-                Route::get($this->getEmailVerificationRouteSlug('/{id}/{hash}'), $this->getEmailVerificationRouteAction())
+                Route::get($this->getEmailVerificationVerifyRouteSlug('/{id}/{hash}'), $this->getEmailVerificationVerifyRouteAction())
                     ->middleware(['signed', 'throttle:6,1'])
-                    ->name($this->getEmailVerificationRouteName());
+                    ->name($this->getEmailVerificationVerifyRouteName());
             });
         }
 

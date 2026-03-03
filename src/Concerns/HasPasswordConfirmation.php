@@ -11,9 +11,7 @@ use Illuminate\Support\Str;
 
 trait HasPasswordConfirmation
 {
-    protected string|Closure|null $passwordConfirmationMiddlewareName = null;
-
-    protected string|Closure|array|null $passwordConfirmationRouteAction = null;
+    protected string|Closure|array|false|null $passwordConfirmationRouteAction = null;
 
     protected ?string $passwordConfirmationRouteSlug = null;
 
@@ -21,13 +19,18 @@ trait HasPasswordConfirmation
 
     protected string|Closure|null $passwordConfirmationResponse = null;
 
+    protected string|Closure|null $passwordConfirmationMiddlewareName = null;
+
+    protected int|false|null $passwordConfirmationMaxAttempts = null;
+
     public function passwordConfirmation(
-        string|Closure|array|null $routeAction = null,
+        string|Closure|array|false|null $routeAction = null,
         ?string $routeSlug = null,
         ?string $routeName = null,
         string|Closure|null $response = null,
         string|Closure|null $middlewareName = null,
-        null|string|Layout $layout = null,
+        int|false|null $maxAttempts = null,
+        Layout|string|null $layout = null,
     ): static {
         $this->passwordConfirmationRouteAction = $routeAction ?? match ($this->getFramework()) {
             Framework::Livewire => \Datalogix\Guardian\Http\Livewire\ConfirmPassword::class,
@@ -36,20 +39,13 @@ trait HasPasswordConfirmation
         $this->passwordConfirmationRouteName = $routeName ?? 'auth.password.confirm';
         $this->passwordConfirmationResponse = $response ?? PasswordConfirmationResponse::class;
         $this->passwordConfirmationMiddlewareName = $middlewareName ?? 'password.confirm';
-
+        $this->passwordConfirmationMaxAttempts = $maxAttempts ?? 5;
         $this->layoutForPage('confirm-password', $layout);
 
         return $this;
     }
 
-    public function getPasswordConfirmationUrl(array $parameters = []): ?string
-    {
-        return $this->hasPasswordConfirmation()
-            ? $this->route($this->getPasswordConfirmationRouteName(), $parameters)
-            : null;
-    }
-
-    public function getPasswordConfirmationRouteAction(): string|Closure|array|null
+    public function getPasswordConfirmationRouteAction(): string|Closure|array|false|null
     {
         return $this->passwordConfirmationRouteAction;
     }
@@ -69,6 +65,35 @@ trait HasPasswordConfirmation
         return value($this->passwordConfirmationResponse);
     }
 
+    public function getPasswordConfirmationMiddlewareName(): ?string
+    {
+        return value($this->passwordConfirmationMiddlewareName);
+    }
+
+    public function getPasswordConfirmationMaxAttempts(): int|false|null
+    {
+        return $this->passwordConfirmationMaxAttempts;
+    }
+
+    public function getPasswordConfirmationUrl(array $parameters = []): ?string
+    {
+        return $this->hasPasswordConfirmation()
+            ? $this->route($this->getPasswordConfirmationRouteName(), $parameters)
+            : null;
+    }
+
+    public function getPasswordConfirmationMiddleware(): ?string
+    {
+        return $this->hasPasswordConfirmation()
+            ? "{$this->getPasswordConfirmationMiddlewareName()}:{$this->generateRouteName($this->getPasswordConfirmationRouteName())}"
+            : null;
+    }
+
+    public function passwordConfirm(): ?string
+    {
+        return $this->getPasswordConfirmationMiddleware();
+    }
+
     public function hasPasswordConfirmation(): bool
     {
         return filled($this->getPasswordConfirmationRouteAction());
@@ -82,22 +107,5 @@ trait HasPasswordConfirmation
         }
 
         return $this;
-    }
-
-    public function getPasswordConfirmationMiddlewareName(): ?string
-    {
-        return value($this->passwordConfirmationMiddlewareName);
-    }
-
-    public function getPasswordConfirmationMiddleware(): ?string
-    {
-        return $this->hasPasswordConfirmation()
-            ? "{$this->getPasswordConfirmationMiddlewareName()}:{$this->generateRouteName($this->getPasswordConfirmationRouteName())}"
-            : null;
-    }
-
-    public function passwordConfirm()
-    {
-        return $this->getPasswordConfirmationMiddleware();
     }
 }

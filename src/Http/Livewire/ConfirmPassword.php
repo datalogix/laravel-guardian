@@ -3,6 +3,7 @@
 namespace Datalogix\Guardian\Http\Livewire;
 
 use Datalogix\Guardian\Actions\ConfirmPassword as ConfirmPasswordAction;
+use Datalogix\Guardian\Guardian;
 
 class ConfirmPassword extends Page
 {
@@ -12,6 +13,8 @@ class ConfirmPassword extends Page
     {
         $data = $this->validate(ConfirmPasswordAction::rules());
 
-        return app(ConfirmPasswordAction::class)($data);
+        app(ConfirmPasswordAction::class)($data);
+
+        return app(Guardian::getPasswordConfirmationResponse());
     }
 }

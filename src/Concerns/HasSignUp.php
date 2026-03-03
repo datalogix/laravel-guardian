@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 
 trait HasSignUp
 {
-    protected string|Closure|array|null $signUpRouteAction = null;
+    protected string|Closure|array|false|null $signUpRouteAction = null;
 
     protected ?string $signUpRouteSlug = null;
 
@@ -20,12 +20,15 @@ trait HasSignUp
 
     protected string|Closure|null $signUpResponse = null;
 
+    protected int|false|null $signUpMaxAttempts = null;
+
     public function signUp(
-        string|Closure|array|null $routeAction = null,
+        string|Closure|array|false|null $routeAction = null,
         ?string $routeSlug = null,
         ?string $routeName = null,
         string|Closure|null $response = null,
-        null|string|Layout $layout = null,
+        int|false|null $maxAttempts = null,
+        Layout|string|null $layout = null,
     ): static {
         $this->signUpRouteAction = $routeAction ?? match ($this->getFramework()) {
             Framework::Livewire => \Datalogix\Guardian\Http\Livewire\SignUp::class,
@@ -33,19 +36,13 @@ trait HasSignUp
         $this->signUpRouteSlug = $routeSlug ?? 'sign-up';
         $this->signUpRouteName = $routeName ?? 'auth.sign-up';
         $this->signUpResponse = $response ?? SignUpResponse::class;
+        $this->signUpMaxAttempts = $maxAttempts ?? 2;
         $this->layoutForPage('sign-up', $layout);
 
         return $this;
     }
 
-    public function getSignUpUrl(array $parameters = []): ?string
-    {
-        return $this->hasSignUp()
-            ? $this->route($this->getSignUpRouteName(), $parameters)
-            : null;
-    }
-
-    public function getSignUpRouteAction(): string|Closure|array|null
+    public function getSignUpRouteAction(): string|Closure|array|false|null
     {
         return $this->signUpRouteAction;
     }
@@ -63,6 +60,18 @@ trait HasSignUp
     public function getSignUpResponse()
     {
         return value($this->signUpResponse);
+    }
+
+    public function getSignUpMaxAttempts(): int|false|null
+    {
+        return $this->signUpMaxAttempts;
+    }
+
+    public function getSignUpUrl(array $parameters = []): ?string
+    {
+        return $this->hasSignUp()
+            ? $this->route($this->getSignUpRouteName(), $parameters)
+            : null;
     }
 
     public function hasSignUp(): bool

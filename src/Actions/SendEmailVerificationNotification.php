@@ -7,13 +7,14 @@ use Exception;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\RateLimiter;
 
 class SendEmailVerificationNotification
 {
+    use Concerns\HasRateLimiter;
+
     public function __invoke(Model $user)
     {
-        return RateLimiter::attempt(sha1(static::class.'|'.request()->ip()), 2, function () use ($user) {
+        return $this->throttleAction(function () use ($user) {
             if (! Guardian::hasEmailVerification()) {
                 return;
             }
@@ -35,6 +36,6 @@ class SendEmailVerificationNotification
             VerifyEmail::createUrlUsing(fn () => Guardian::getVerifyEmailUrl($user));
 
             $user->notify(app(VerifyEmail::class));
-        });
+        }, $user->getKey(), Guardian::getEmailVerificationMaxAttempts());
     }
 }

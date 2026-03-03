@@ -13,7 +13,5 @@ class Logout
 
         Session::invalidate();
         Session::regenerateToken();
-
-        return app(Guardian::getLogoutResponse());
     }
 }

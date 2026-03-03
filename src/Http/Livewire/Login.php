@@ -27,6 +27,8 @@ class Login extends Page
     {
         $data = $this->validate(LoginAction::rules());
 
-        return app(LoginAction::class)($data, $this->remember);
+        app(LoginAction::class)($data, $this->remember);
+
+        return app(Guardian::getLoginResponse());
     }
 }

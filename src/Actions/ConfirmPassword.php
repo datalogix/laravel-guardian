@@ -9,18 +9,21 @@ use Illuminate\Validation\ValidationException;
 
 class ConfirmPassword
 {
+    use Concerns\HasRateLimiter;
+
     public function __invoke(array $data = [])
     {
         $auth = Guardian::auth();
-        $data['email'] = $auth->user()->email;
 
-        if (! $auth->validate($data)) {
-            throw ValidationException::withMessages(['password' => [__('auth.password')]]);
-        }
+        return $this->throttleAction(function () use ($data, $auth) {
+            $data['email'] = $auth->user()->email;
 
-        Session::put('auth.password_confirmed_at', time());
+            if (! $auth->validate($data)) {
+                throw ValidationException::withMessages(['password' => [__('auth.password')]]);
+            }
 
-        return app(Guardian::getPasswordConfirmationResponse());
+            Session::put('auth.password_confirmed_at', time());
+        }, $auth->id(), Guardian::getPasswordConfirmationMaxAttempts());
     }
 
     public static function rules(): array

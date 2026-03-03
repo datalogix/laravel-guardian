@@ -2,7 +2,9 @@
 
 namespace Datalogix\Guardian;
 
+use Datalogix\Guardian\Exceptions\MultipleDefaultFortressesException;
 use Datalogix\Guardian\Exceptions\NoDefaultFortressSetException;
+use Datalogix\Guardian\Exceptions\NoFortressRegisteredException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
@@ -22,11 +24,24 @@ class FortressRegistry
             return;
         }
 
+        $this->resetDefaultFortress();
+
         if (app()->resolved('guardian')) {
             app('guardian')->setCurrentFortress($fortress);
         }
 
         app()->resolving('guardian', fn (GuardianManager $manager) => $manager->setCurrentFortress($fortress));
+    }
+
+    public function resetDefaultFortress(): void
+    {
+        $this->defaultFortress = null;
+    }
+
+    public function reset(): void
+    {
+        $this->fortress = [];
+        $this->resetDefaultFortress();
     }
 
     public function getDefault(): Fortress
@@ -66,5 +81,25 @@ class FortressRegistry
     public function all(): array
     {
         return $this->fortress;
+    }
+
+    public function validate(): void
+    {
+        if (count($this->fortress) === 0) {
+            throw NoFortressRegisteredException::make();
+        }
+
+        $defaults = array_filter(
+            $this->all(),
+            fn ($fortress) => $fortress->isDefault()
+        );
+
+        if (count($defaults) === 0) {
+            throw NoDefaultFortressSetException::make();
+        }
+
+        if (count($defaults) > 1) {
+            throw MultipleDefaultFortressesException::make();
+        }
     }
 }

@@ -3,6 +3,7 @@
 namespace Datalogix\Guardian\Http\Livewire;
 
 use Datalogix\Guardian\Actions\ResetPassword as ResetPasswordAction;
+use Datalogix\Guardian\Guardian;
 use Livewire\Attributes\Locked;
 
 class ResetPassword extends Page
@@ -26,6 +27,8 @@ class ResetPassword extends Page
     {
         $data = $this->validate(ResetPasswordAction::rules());
 
-        return app(ResetPasswordAction::class)($data);
+        $status = app(ResetPasswordAction::class)($data);
+
+        return app(Guardian::getResetPasswordResponse(), ['status' => $status]);
     }
 }

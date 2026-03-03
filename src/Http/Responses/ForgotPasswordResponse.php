@@ -5,7 +5,7 @@ namespace Datalogix\Guardian\Http\Responses;
 use Datalogix\Guardian\Guardian;
 use Illuminate\Contracts\Support\Responsable;
 
-class ResetPasswordResponse implements Responsable
+class ForgotPasswordResponse implements Responsable
 {
     public function __construct(
         protected string $status
@@ -14,7 +14,5 @@ class ResetPasswordResponse implements Responsable
     public function toResponse($request)
     {
         Guardian::notify($this->status);
-
-        return Guardian::redirect(Guardian::hasLogin() ? Guardian::getLoginUrl() : null);
     }
 }

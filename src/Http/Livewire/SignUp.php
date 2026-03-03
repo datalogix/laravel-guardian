@@ -33,6 +33,8 @@ class SignUp extends Page
     {
         $data = $this->validate(SignUpAction::rules());
 
-        return app(SignUpAction::class)($data);
+        app(SignUpAction::class)($data);
+
+        return app(Guardian::getSignUpResponse());
     }
 }

@@ -13,21 +13,23 @@ use Illuminate\Validation\Rules\Password;
 
 class SignUp
 {
+    use Concerns\HasRateLimiter;
+
     protected static string $userModel;
 
     public function __invoke(array $data = [])
     {
-        $user = Guardian::wrapInDatabaseTransaction(fn () => static::getUserModel()::create($data));
+        return $this->throttleAction(function () use ($data) {
+            $user = Guardian::wrapInDatabaseTransaction(fn () => static::getUserModel()::create($data));
 
-        event(new Registered($user));
+            event(new Registered($user));
 
-        app(SendEmailVerificationNotification::class)($user);
+            app(SendEmailVerificationNotification::class)($user);
 
-        Guardian::auth()->login($user);
+            Guardian::auth()->login($user);
 
-        Session::regenerate();
-
-        return app(Guardian::getSignUpResponse());
+            Session::regenerate();
+        }, $data['email'] ?? null, Guardian::getSignUpMaxAttempts());
     }
 
     public static function rules(): array

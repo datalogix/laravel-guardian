@@ -12,9 +12,11 @@ use Illuminate\Validation\Rules\Password;
 
 class Login
 {
+    use Concerns\HasRateLimiter;
+
     public function __invoke(array $data = [], bool $remember = true)
     {
-        $throttleKey = sha1(static::class.'|'.request()->ip());
+        $throttleKey = $this->throttleKey();
         $this->ensureIsNotRateLimited($throttleKey);
 
         $credentials = $this->parseCredentials($data);
@@ -38,8 +40,6 @@ class Login
 
         RateLimiter::clear($throttleKey);
         Session::regenerate();
-
-        return app(Guardian::getLoginResponse());
     }
 
     protected function parseCredentials(array $data = []): array
@@ -70,9 +70,9 @@ class Login
 
     protected function ensureIsNotRateLimited(string $throttleKey)
     {
-        $maxAttempts = Guardian::getLoginMaxAttempts() ?? 5;
+        $maxAttempts = Guardian::getLoginMaxAttempts();
 
-        if ($maxAttempts === false) {
+        if (! $this->shouldThrottle($maxAttempts)) {
             return;
         }
 

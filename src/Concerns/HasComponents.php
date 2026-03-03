@@ -38,7 +38,8 @@ trait HasComponents
             $this->getResetPasswordRouteAction(),
             $this->getSignUpRouteAction(),
             $this->getPasswordConfirmationRouteAction(),
-            $this->getEmailVerificationPromptRouteAction()
+            $this->getEmailVerificationPromptRouteAction(),
+            $this->getEmailVerificationVerifyRouteAction(),
         );
 
         foreach ($this->livewireComponents as $componentName => $componentClass) {

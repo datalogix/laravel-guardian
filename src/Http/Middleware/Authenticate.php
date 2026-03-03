@@ -19,7 +19,9 @@ class Authenticate extends BaseAuthenticate
 
         $this->auth->shouldUse(Guardian::getGuard());
 
-        abort_if(Guardian::cannotAccess($auth->user()), 403);
+        if (Guardian::cannotAccess($auth->user())) {
+            abort(403);
+        }
     }
 
     protected function redirectTo($request): ?string

@@ -3,6 +3,7 @@
 namespace Datalogix\Guardian\Http\Livewire;
 
 use Datalogix\Guardian\Actions\ForgotPassword as ForgotPasswordAction;
+use Datalogix\Guardian\Guardian;
 
 class ForgotPassword extends Page
 {
@@ -12,6 +13,8 @@ class ForgotPassword extends Page
     {
         $data = $this->validate(ForgotPasswordAction::rules());
 
-        return app(ForgotPasswordAction::class)($data);
+        $status = app(ForgotPasswordAction::class)($data);
+
+        return app(Guardian::getForgotPasswordResponse(), ['status' => $status]);
     }
 }

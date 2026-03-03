@@ -24,7 +24,12 @@ class GuardianServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        app()->booted(fn () => $this->loadRoutesFrom(__DIR__.'/../routes/web.php'));
+        app()->booted(function () {
+            app(FortressRegistry::class)->validate();
+
+            $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+        });
+
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'guardian');
 
         if (class_exists(Livewire::class)) {

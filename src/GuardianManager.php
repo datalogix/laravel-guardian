@@ -3,6 +3,9 @@
 namespace Datalogix\Guardian;
 
 use Closure;
+use Datalogix\Guardian\Events\FortressBootCompleted;
+use Datalogix\Guardian\Events\FortressBootFailed;
+use Datalogix\Guardian\Events\FortressBootStarting;
 use Datalogix\Guardian\Events\ServingGuardian;
 use Exception;
 use Illuminate\Support\Facades\Event;
@@ -76,10 +79,7 @@ class GuardianManager
         }
 
         if (app()->runningInConsole()) {
-            throw new Exception('
-                The current domain is not set, but multiple domains are registered for the guardian.
-                Please use [Guardian::currentDomain(\'example.com\')] to set the current domain to ensure that guardian URLs are generated correctly.
-            ');
+            return 'localhost';
         }
 
         return request()->getHost();
@@ -91,9 +91,20 @@ class GuardianManager
             return;
         }
 
-        $this->getCurrentOrDefaultFortress()->boot();
+        $fortress = $this->getCurrentOrDefaultFortress();
 
-        $this->isCurrentFortressBooted = true;
+        event(new FortressBootStarting($fortress));
+
+        try {
+            app(FortressRegistry::class)->validate();
+            $fortress->boot();
+
+            $this->isCurrentFortressBooted = true;
+            event(new FortressBootCompleted($fortress));
+        } catch (Exception $e) {
+            event(new FortressBootFailed($fortress, $e));
+            throw $e;
+        }
     }
 
     public function isServing(): bool
@@ -111,8 +122,36 @@ class GuardianManager
         $this->isServing = $condition;
     }
 
+    public function resetCurrentFortress(): static
+    {
+        $this->currentFortress = null;
+        $this->isCurrentFortressBooted = false;
+
+        return $this;
+    }
+
+    public function resetCurrentDomain(): static
+    {
+        $this->currentDomain = null;
+
+        return $this;
+    }
+
+    public function reset(): static
+    {
+        $this->resetCurrentFortress();
+        $this->resetCurrentDomain();
+        $this->isServing = false;
+
+        return $this;
+    }
+
     public function __call($method, $parameters)
     {
-        return $this->forwardCallTo($this->getCurrentOrDefaultFortress(), $method, $parameters);
+        return $this->forwardCallTo(
+            $this->getCurrentOrDefaultFortress(),
+            $method,
+            $parameters
+        );
     }
 }

@@ -17,6 +17,11 @@ trait HasAuth
         return auth()->guard($this->getGuard());
     }
 
+    public function isAuthenticated(): bool
+    {
+        return $this->auth()->check();
+    }
+
     public function user(): ?Authenticatable
     {
         return $this->auth()->user();

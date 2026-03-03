@@ -12,23 +12,23 @@ use Illuminate\Support\Str;
 
 trait HasLogin
 {
-    protected string|Closure|array|null $loginRouteAction = null;
+    protected string|Closure|array|false|null $loginRouteAction = null;
 
     protected ?string $loginRouteSlug = null;
 
     protected ?string $loginRouteName = null;
 
-    protected int|false|null $loginMaxAttempts = null;
-
     protected string|Closure|null $loginResponse = null;
 
+    protected int|false|null $loginMaxAttempts = null;
+
     public function login(
-        string|Closure|array|null $routeAction = null,
+        string|Closure|array|false|null $routeAction = null,
         ?string $routeSlug = null,
         ?string $routeName = null,
         string|Closure|null $response = null,
         int|false|null $maxAttempts = null,
-        null|string|Layout $layout = null,
+        Layout|string|null $layout = null,
     ): static {
         $this->loginRouteAction = $routeAction ?? match ($this->getFramework()) {
             Framework::Livewire => \Datalogix\Guardian\Http\Livewire\Login::class,
@@ -36,20 +36,13 @@ trait HasLogin
         $this->loginRouteSlug = $routeSlug ?? 'login';
         $this->loginRouteName = $routeName ?? 'auth.login';
         $this->loginResponse = $response ?? LoginResponse::class;
-        $this->loginMaxAttempts = $maxAttempts;
+        $this->loginMaxAttempts = $maxAttempts ?? 5;
         $this->layoutForPage('login', $layout);
 
         return $this;
     }
 
-    public function getLoginUrl(array $parameters = []): ?string
-    {
-        return $this->hasLogin()
-            ? $this->route($this->getLoginRouteName(), $parameters)
-            : null;
-    }
-
-    public function getLoginRouteAction(): string|Closure|array|null
+    public function getLoginRouteAction(): string|Closure|array|false|null
     {
         return $this->loginRouteAction;
     }
@@ -72,6 +65,13 @@ trait HasLogin
     public function getLoginMaxAttempts(): int|false|null
     {
         return $this->loginMaxAttempts;
+    }
+
+    public function getLoginUrl(array $parameters = []): ?string
+    {
+        return $this->hasLogin()
+            ? $this->route($this->getLoginRouteName(), $parameters)
+            : null;
     }
 
     public function hasLogin(): bool

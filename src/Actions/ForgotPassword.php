@@ -7,13 +7,14 @@ use Illuminate\Auth\Events\PasswordResetLinkSent;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Facades\Session;
 
 class ForgotPassword
 {
+    use Concerns\HasRateLimiter;
+
     public function __invoke(array $data = [])
     {
-        $status = Password::broker(Guardian::getPasswordBroker())->sendResetLink(
+        return $this->throttleAction(fn () => Password::broker(Guardian::getPasswordBroker())->sendResetLink(
             $data,
             function (CanResetPassword $user, string $token) {
                 if (Guardian::cannotAccess($user)) {
@@ -26,9 +27,7 @@ class ForgotPassword
 
                 event(new PasswordResetLinkSent($user));
             },
-        );
-
-        Session::flash('status', __($status));
+        ), $data['email'] ?? null, Guardian::getForgotPasswordMaxAttempts());
     }
 
     public static function rules(): array

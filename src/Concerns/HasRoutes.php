@@ -70,6 +70,13 @@ trait HasRoutes
         return route($this->generateRouteName($name), $parameters, $absolute);
     }
 
+    public function notify(string $message, ?string $type = null): void
+    {
+        app()->bound('tallkit')
+            ? app('tallkit')->alert($message, $type)
+            : session()->flash('status', __($message));
+    }
+
     public function redirect(?string $path = null, bool $intended = false, bool $navigate = true)
     {
         $path ??= $this->getUrl();
