@@ -1,7 +1,9 @@
 <?php
 
+use Datalogix\Guardian\Enums\Framework;
+
 return [
-    'framework' => env('GUARDIAN_FRAMEWORK', 'livewire'),
+    'framework' => Framework::tryFrom(env('GUARDIAN_FRAMEWORK')) ?? Framework::Livewire,
 
     /*
     |--------------------------------------------------------------------------

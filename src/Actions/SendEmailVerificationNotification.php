@@ -36,6 +36,6 @@ class SendEmailVerificationNotification
             VerifyEmail::createUrlUsing(fn () => Guardian::getVerifyEmailUrl($user));
 
             $user->notify(app(VerifyEmail::class));
-        }, $user->getKey(), Guardian::getEmailVerificationMaxAttempts());
+        }, $user->getKey(), Guardian::getEmailVerificationVerifyFeature()->getMaxAttempts());
     }
 }

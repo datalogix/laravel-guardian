@@ -2,6 +2,7 @@
 
 namespace Datalogix\Guardian\Actions;
 
+use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
 use Datalogix\Guardian\Enums\IdentifierKey;
 use Datalogix\Guardian\Exceptions\LoginException;
 use Datalogix\Guardian\Guardian;
@@ -10,11 +11,11 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rules\Password;
 
-class Login
+class Login implements HasValidationRules
 {
     use Concerns\HasRateLimiter;
 
-    public function __invoke(array $data = [], bool $remember = true)
+    public function __invoke(array $data = [], bool $remember = true): void
     {
         $throttleKey = $this->throttleKey();
         $this->ensureIsNotRateLimited($throttleKey);
@@ -68,9 +69,9 @@ class Login
         ];
     }
 
-    protected function ensureIsNotRateLimited(string $throttleKey)
+    protected function ensureIsNotRateLimited(string $throttleKey): void
     {
-        $maxAttempts = Guardian::getLoginMaxAttempts();
+        $maxAttempts = Guardian::getLoginFeature()->getMaxAttempts();
 
         if (! $this->shouldThrottle($maxAttempts)) {
             return;

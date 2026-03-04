@@ -5,7 +5,6 @@ namespace Datalogix\Guardian;
 class Fortress
 {
     use Concerns\HasAuth;
-    use Concerns\HasComponents;
     use Concerns\HasDatabaseTransactions;
     use Concerns\HasDefault;
     use Concerns\HasEmailVerification;
@@ -14,6 +13,7 @@ class Fortress
     use Concerns\HasIdentifier;
     use Concerns\HasLayouts;
     use Concerns\HasLifecycleHooks;
+    use Concerns\HasLivewireComponents;
     use Concerns\HasLogin;
     use Concerns\HasLogout;
     use Concerns\HasMiddleware;

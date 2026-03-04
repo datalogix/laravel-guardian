@@ -3,41 +3,31 @@
 namespace Datalogix\Guardian\Concerns;
 
 use Closure;
-use Datalogix\Guardian\Enums\Framework;
 use Datalogix\Guardian\Enums\Layout;
-use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
-use Datalogix\Guardian\Http\Responses\ForgotPasswordResponse;
-use Datalogix\Guardian\Http\Responses\ResetPasswordResponse;
+use Datalogix\Guardian\Features\ForgotPasswordFeature;
+use Datalogix\Guardian\Features\ResetPasswordFeature;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Str;
 
 trait HasPasswordReset
 {
-    protected string|Closure|array|false|null $forgotPasswordRouteAction = null;
+    protected ?ForgotPasswordFeature $forgotPasswordFeature = null;
 
-    protected ?string $forgotPasswordRouteSlug = null;
-
-    protected ?string $forgotPasswordRouteName = null;
-
-    protected string|Closure|null $forgotPasswordResponse = null;
-
-    protected int|false|null $forgotPasswordMaxAttempts = null;
-
-    protected string|Closure|array|false|null $resetPasswordRouteAction = null;
-
-    protected ?string $resetPasswordRouteSlug = null;
-
-    protected ?string $resetPasswordRouteName = null;
-
-    protected string|Closure|null $resetPasswordResponse = null;
-
-    protected int|false|null $resetPasswordMaxAttempts = null;
+    protected ?ResetPasswordFeature $resetPasswordFeature = null;
 
     protected ?string $passwordBroker = null;
+
+    public function getForgotPasswordFeature(): ForgotPasswordFeature
+    {
+        return $this->forgotPasswordFeature ??= new ForgotPasswordFeature($this);
+    }
+
+    public function getResetPasswordFeature(): ResetPasswordFeature
+    {
+        return $this->resetPasswordFeature ??= new ResetPasswordFeature($this);
+    }
 
     public function passwordReset(
         string|Closure|array|false|null $forgotPasswordRouteAction = null,
@@ -54,77 +44,27 @@ trait HasPasswordReset
         Layout|string|null $resetPasswordLayout = null,
         ?string $passwordBroker = null,
     ): static {
-        $this->forgotPasswordRouteAction = $forgotPasswordRouteAction ?? match ($this->getFramework()) {
-            Framework::Livewire => \Datalogix\Guardian\Http\Livewire\ForgotPassword::class,
-        };
-        $this->forgotPasswordRouteSlug = $forgotPasswordRouteSlug ?? 'forgot-password';
-        $this->forgotPasswordRouteName = $forgotPasswordRouteName ?? 'auth.password.request';
-        $this->forgotPasswordResponse = $forgotPasswordResponse ?? ForgotPasswordResponse::class;
-        $this->forgotPasswordMaxAttempts = $forgotPasswordMaxAttempts ?? 3;
-        $this->layoutForPage('forgot-password', $forgotPasswordLayout);
+        $this->getForgotPasswordFeature()->configure(
+            $forgotPasswordRouteAction,
+            $forgotPasswordRouteSlug,
+            $forgotPasswordRouteName,
+            $forgotPasswordResponse,
+            $forgotPasswordMaxAttempts,
+            $forgotPasswordLayout,
+        );
 
-        $this->resetPasswordRouteAction = $resetPasswordRouteAction ?? match ($this->getFramework()) {
-            Framework::Livewire => \Datalogix\Guardian\Http\Livewire\ResetPassword::class,
-        };
-        $this->resetPasswordRouteSlug = $resetPasswordRouteSlug ?? 'reset-password';
-        $this->resetPasswordRouteName = $resetPasswordRouteName ?? 'auth.password.reset';
-        $this->resetPasswordResponse = $resetPasswordResponse ?? ResetPasswordResponse::class;
-        $this->resetPasswordMaxAttempts = $resetPasswordMaxAttempts ?? 5;
-        $this->layoutForPage('reset-password', $resetPasswordLayout);
+        $this->getResetPasswordFeature()->configure(
+            $resetPasswordRouteAction,
+            $resetPasswordRouteSlug,
+            $resetPasswordRouteName,
+            $resetPasswordResponse,
+            $resetPasswordMaxAttempts,
+            $resetPasswordLayout,
+        );
 
         $this->passwordBroker = $passwordBroker;
 
         return $this;
-    }
-
-    public function getForgotPasswordRouteAction(): string|Closure|array|false|null
-    {
-        return $this->forgotPasswordRouteAction;
-    }
-
-    public function getForgotPasswordRouteSlug(): string
-    {
-        return Str::start($this->forgotPasswordRouteSlug, '/');
-    }
-
-    public function getForgotPasswordRouteName(): ?string
-    {
-        return $this->forgotPasswordRouteName;
-    }
-
-    public function getForgotPasswordResponse()
-    {
-        return value($this->forgotPasswordResponse);
-    }
-
-    public function getForgotPasswordMaxAttempts(): int|false|null
-    {
-        return $this->forgotPasswordMaxAttempts;
-    }
-
-    public function getResetPasswordRouteAction(): string|Closure|array|false|null
-    {
-        return $this->resetPasswordRouteAction;
-    }
-
-    public function getResetPasswordRouteSlug(string $suffix = ''): string
-    {
-        return Str::start($this->resetPasswordRouteSlug, '/').$suffix;
-    }
-
-    public function getResetPasswordRouteName(): ?string
-    {
-        return $this->resetPasswordRouteName;
-    }
-
-    public function getResetPasswordResponse()
-    {
-        return value($this->resetPasswordResponse);
-    }
-
-    public function getResetPasswordMaxAttempts(): int|false|null
-    {
-        return $this->resetPasswordMaxAttempts;
     }
 
     public function getPasswordBroker(): ?string
@@ -132,17 +72,10 @@ trait HasPasswordReset
         return $this->passwordBroker;
     }
 
-    public function getForgotPasswordUrl(array $parameters = []): ?string
-    {
-        return $this->hasPasswordReset()
-            ? $this->route('auth.password.request', $parameters)
-            : null;
-    }
-
     public function getResetPasswordUrl(string $token, CanResetPassword|Model|Authenticatable $user, array $parameters = []): string
     {
         return URL::signedRoute(
-            $this->generateRouteName('auth.password.reset'),
+            $this->generateRouteName($this->getResetPasswordFeature()->getRouteName()),
             [
                 'email' => $user->getEmailForPasswordReset(),
                 'token' => $token,
@@ -151,23 +84,10 @@ trait HasPasswordReset
         );
     }
 
-    public function hasPasswordReset(): bool
-    {
-        return filled($this->getForgotPasswordRouteAction()) && filled($this->getResetPasswordRouteAction());
-    }
-
     public function passwordResetRoutes(): static
     {
-        if ($this->hasPasswordReset()) {
-            Route::middleware(RedirectIfAuthenticated::class)->group(function () {
-                Route::get($this->getForgotPasswordRouteSlug(), $this->getForgotPasswordRouteAction())
-                    ->name($this->getForgotPasswordRouteName());
-
-                Route::get($this->getResetPasswordRouteSlug('/{token?}'), $this->getResetPasswordRouteAction())
-                    ->middleware('signed')
-                    ->name($this->getResetPasswordRouteName());
-            });
-        }
+        $this->getForgotPasswordFeature()->registerRoutes();
+        $this->getResetPasswordFeature()->registerRoutes();
 
         return $this;
     }

@@ -35,6 +35,6 @@ class SignUp extends Page
 
         app(SignUpAction::class)($data);
 
-        return app(Guardian::getSignUpResponse());
+        return app(Guardian::getSignUpFeature()->getResponse());
     }
 }

@@ -2,28 +2,34 @@
 
 namespace Datalogix\Guardian\Actions;
 
+use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
 use Datalogix\Guardian\Guardian;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 
-class ConfirmPassword
+class ConfirmPassword implements HasValidationRules
 {
     use Concerns\HasRateLimiter;
 
-    public function __invoke(array $data = [])
+    public function __invoke(array $data = []): void
     {
         $auth = Guardian::auth();
+        $user = $auth->user();
 
-        return $this->throttleAction(function () use ($data, $auth) {
-            $data['email'] = $auth->user()->email;
+        if (! $user) {
+            throw ValidationException::withMessages(['password' => [__('auth.password')]]);
+        }
+
+        $this->throttleAction(function () use ($data, $auth, $user) {
+            $data['email'] = $user->email;
 
             if (! $auth->validate($data)) {
                 throw ValidationException::withMessages(['password' => [__('auth.password')]]);
             }
 
             Session::put('auth.password_confirmed_at', time());
-        }, $auth->id(), Guardian::getPasswordConfirmationMaxAttempts());
+        }, $auth->id(), Guardian::getPasswordConfirmationFeature()->getMaxAttempts());
     }
 
     public static function rules(): array

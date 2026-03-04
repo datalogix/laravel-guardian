@@ -2,6 +2,7 @@
 
 namespace Datalogix\Guardian\Actions;
 
+use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
 use Datalogix\Guardian\Guardian;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -13,11 +14,11 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 
-class ResetPassword
+class ResetPassword implements HasValidationRules
 {
     use Concerns\HasRateLimiter;
 
-    public function __invoke(array $data = [])
+    public function __invoke(array $data = []): string
     {
         return $this->throttleAction(function () use ($data) {
             $hasPanelAccess = true;
@@ -48,7 +49,7 @@ class ResetPassword
             }
 
             return $status;
-        }, $data['email'] ?? null, Guardian::getResetPasswordMaxAttempts());
+        }, $data['email'] ?? null, Guardian::getResetPasswordFeature()->getMaxAttempts());
     }
 
     public static function rules(): array
@@ -56,7 +57,8 @@ class ResetPassword
         return [
             'token' => ['required'],
             'email' => ['required', 'string', 'email', 'max:255'],
-            'new_password' => ['required', 'string', PasswordRule::default(), 'confirmed'],
+            'password' => ['required', 'string', PasswordRule::default(), 'confirmed'],
+            'password_confirmation' => ['required', 'string', PasswordRule::default()],
         ];
     }
 }

@@ -3,8 +3,8 @@
 namespace Datalogix\Guardian\Events;
 
 use Datalogix\Guardian\Fortress;
-use Exception;
 use Illuminate\Foundation\Events\Dispatchable;
+use Throwable;
 
 class FortressBootFailed
 {
@@ -12,6 +12,6 @@ class FortressBootFailed
 
     public function __construct(
         public readonly Fortress $fortress,
-        public readonly Exception $exception,
+        public readonly Throwable $exception,
     ) {}
 }

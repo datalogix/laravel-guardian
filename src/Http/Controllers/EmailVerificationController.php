@@ -12,6 +12,6 @@ class EmailVerificationController
     {
         app(VerifyEmail::class)($request);
 
-        return app(Guardian::getEmailVerificationVerifyResponse());
+        return app(Guardian::getEmailVerificationVerifyFeature()->getResponse());
     }
 }

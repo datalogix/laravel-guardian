@@ -7,9 +7,9 @@ use Datalogix\Guardian\Events\FortressBootCompleted;
 use Datalogix\Guardian\Events\FortressBootFailed;
 use Datalogix\Guardian\Events\FortressBootStarting;
 use Datalogix\Guardian\Events\ServingGuardian;
-use Exception;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Traits\ForwardsCalls;
+use Throwable;
 
 class GuardianManager
 {
@@ -25,12 +25,19 @@ class GuardianManager
 
     public function __construct()
     {
-        app()->resolved(FortressRegistry::class) || app(FortressRegistry::class);
+        if (! app()->resolved(FortressRegistry::class)) {
+            app(FortressRegistry::class);
+        }
     }
 
     public function registerFortress(Fortress $fortress): void
     {
         app(FortressRegistry::class)->register($fortress);
+    }
+
+    public function getFortresses(): array
+    {
+        return app(FortressRegistry::class)->all();
     }
 
     public function getCurrentOrDefaultFortress(): Fortress
@@ -53,17 +60,37 @@ class GuardianManager
         return app(FortressRegistry::class)->get($id, $isStrict);
     }
 
-    public function getFortresses(): array
-    {
-        return app(FortressRegistry::class)->all();
-    }
-
     public function setCurrentFortress(?Fortress $fortress): void
     {
         $this->currentFortress = $fortress;
+        $this->isCurrentFortressBooted = false;
     }
 
-    public function currentDomain(?string $domain): void
+    public function resetCurrentFortress(): static
+    {
+        $this->currentFortress = null;
+        $this->isCurrentFortressBooted = false;
+
+        return $this;
+    }
+
+    public function resetCurrentDomain(): static
+    {
+        $this->currentDomain = null;
+
+        return $this;
+    }
+
+    public function reset(): static
+    {
+        $this->resetCurrentFortress();
+        $this->resetCurrentDomain();
+        $this->isServing = false;
+
+        return $this;
+    }
+
+    public function setCurrentDomain(?string $domain): void
     {
         $this->currentDomain = $domain;
     }
@@ -101,7 +128,7 @@ class GuardianManager
 
             $this->isCurrentFortressBooted = true;
             event(new FortressBootCompleted($fortress));
-        } catch (Exception $e) {
+        } catch (Throwable $e) {
             event(new FortressBootFailed($fortress, $e));
             throw $e;
         }
@@ -120,30 +147,6 @@ class GuardianManager
     public function setServingStatus(bool $condition = true): void
     {
         $this->isServing = $condition;
-    }
-
-    public function resetCurrentFortress(): static
-    {
-        $this->currentFortress = null;
-        $this->isCurrentFortressBooted = false;
-
-        return $this;
-    }
-
-    public function resetCurrentDomain(): static
-    {
-        $this->currentDomain = null;
-
-        return $this;
-    }
-
-    public function reset(): static
-    {
-        $this->resetCurrentFortress();
-        $this->resetCurrentDomain();
-        $this->isServing = false;
-
-        return $this;
     }
 
     public function __call($method, $parameters)

@@ -1,4 +1,5 @@
 # Laravel Guardian
 
-- Add login socialite
+- Add two factor auth
 - Add inertia
+- Add login socialite

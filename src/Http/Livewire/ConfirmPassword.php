@@ -15,6 +15,6 @@ class ConfirmPassword extends Page
 
         app(ConfirmPasswordAction::class)($data);
 
-        return app(Guardian::getPasswordConfirmationResponse());
+        return app(Guardian::getPasswordConfirmationFeature()->getResponse());
     }
 }

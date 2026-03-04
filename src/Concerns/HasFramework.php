@@ -10,20 +10,34 @@ trait HasFramework
 
     public function inertia(): static
     {
-        $this->framework = Framework::Inertia;
-
-        return $this;
+        return $this->setFramework(Framework::Inertia);
     }
 
     public function livewire(): static
     {
-        $this->framework = Framework::Livewire;
+        return $this->setFramework(Framework::Livewire);
+    }
+
+    protected function setFramework(Framework $framework): static
+    {
+        $this->framework = $framework;
 
         return $this;
     }
 
     public function getFramework(): Framework
     {
-        return $this->framework ?? Framework::tryFrom(config('guardian.framework'));
+        if (isset($this->framework)) {
+            return $this->framework;
+        }
+
+        $config = config('guardian.framework');
+
+        $this->framework = match (true) {
+            $config instanceof Framework => $config,
+            default => Framework::tryFrom($config) ?? Framework::Livewire,
+        };
+
+        return $this->framework;
     }
 }

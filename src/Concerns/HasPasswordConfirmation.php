@@ -3,25 +3,19 @@
 namespace Datalogix\Guardian\Concerns;
 
 use Closure;
-use Datalogix\Guardian\Enums\Framework;
 use Datalogix\Guardian\Enums\Layout;
-use Datalogix\Guardian\Http\Responses\PasswordConfirmationResponse;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Str;
+use Datalogix\Guardian\Features\PasswordConfirmationFeature;
 
 trait HasPasswordConfirmation
 {
-    protected string|Closure|array|false|null $passwordConfirmationRouteAction = null;
+    protected ?PasswordConfirmationFeature $passwordConfirmationFeature = null;
 
-    protected ?string $passwordConfirmationRouteSlug = null;
+    protected ?string $passwordConfirmationMiddlewareName = null;
 
-    protected ?string $passwordConfirmationRouteName = null;
-
-    protected string|Closure|null $passwordConfirmationResponse = null;
-
-    protected string|Closure|null $passwordConfirmationMiddlewareName = null;
-
-    protected int|false|null $passwordConfirmationMaxAttempts = null;
+    public function getPasswordConfirmationFeature(): PasswordConfirmationFeature
+    {
+        return $this->passwordConfirmationFeature ??= new PasswordConfirmationFeature($this);
+    }
 
     public function passwordConfirmation(
         string|Closure|array|false|null $routeAction = null,
@@ -32,60 +26,29 @@ trait HasPasswordConfirmation
         int|false|null $maxAttempts = null,
         Layout|string|null $layout = null,
     ): static {
-        $this->passwordConfirmationRouteAction = $routeAction ?? match ($this->getFramework()) {
-            Framework::Livewire => \Datalogix\Guardian\Http\Livewire\ConfirmPassword::class,
-        };
-        $this->passwordConfirmationRouteSlug = $routeSlug ?? 'confirm-password';
-        $this->passwordConfirmationRouteName = $routeName ?? 'auth.password.confirm';
-        $this->passwordConfirmationResponse = $response ?? PasswordConfirmationResponse::class;
+        $this->getPasswordConfirmationFeature()->configure(
+            $routeAction,
+            $routeSlug,
+            $routeName,
+            $response,
+            $maxAttempts,
+            $layout,
+        );
+
         $this->passwordConfirmationMiddlewareName = $middlewareName ?? 'password.confirm';
-        $this->passwordConfirmationMaxAttempts = $maxAttempts ?? 5;
-        $this->layoutForPage('confirm-password', $layout);
 
         return $this;
     }
 
-    public function getPasswordConfirmationRouteAction(): string|Closure|array|false|null
-    {
-        return $this->passwordConfirmationRouteAction;
-    }
-
-    public function getPasswordConfirmationRouteSlug(): string
-    {
-        return Str::start($this->passwordConfirmationRouteSlug, '/');
-    }
-
-    public function getPasswordConfirmationRouteName(): ?string
-    {
-        return $this->passwordConfirmationRouteName;
-    }
-
-    public function getPasswordConfirmationResponse()
-    {
-        return value($this->passwordConfirmationResponse);
-    }
-
     public function getPasswordConfirmationMiddlewareName(): ?string
     {
-        return value($this->passwordConfirmationMiddlewareName);
-    }
-
-    public function getPasswordConfirmationMaxAttempts(): int|false|null
-    {
-        return $this->passwordConfirmationMaxAttempts;
-    }
-
-    public function getPasswordConfirmationUrl(array $parameters = []): ?string
-    {
-        return $this->hasPasswordConfirmation()
-            ? $this->route($this->getPasswordConfirmationRouteName(), $parameters)
-            : null;
+        return $this->passwordConfirmationMiddlewareName;
     }
 
     public function getPasswordConfirmationMiddleware(): ?string
     {
-        return $this->hasPasswordConfirmation()
-            ? "{$this->getPasswordConfirmationMiddlewareName()}:{$this->generateRouteName($this->getPasswordConfirmationRouteName())}"
+        return $this->hasFeature()
+            ? "{$this->getPasswordConfirmationMiddlewareName()}:{$this->generateRouteName($this->getPasswordConfirmationFeature()->getRouteName())}"
             : null;
     }
 
@@ -94,17 +57,9 @@ trait HasPasswordConfirmation
         return $this->getPasswordConfirmationMiddleware();
     }
 
-    public function hasPasswordConfirmation(): bool
-    {
-        return filled($this->getPasswordConfirmationRouteAction());
-    }
-
     public function passwordConfirmationRoutes(): static
     {
-        if ($this->hasPasswordConfirmation()) {
-            Route::get($this->getPasswordConfirmationRouteSlug(), $this->getPasswordConfirmationRouteAction())
-                ->name($this->getPasswordConfirmationRouteName());
-        }
+        $this->getPasswordConfirmationFeature()->registerRoutes();
 
         return $this;
     }

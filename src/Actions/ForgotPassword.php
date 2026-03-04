@@ -2,13 +2,14 @@
 
 namespace Datalogix\Guardian\Actions;
 
+use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
 use Datalogix\Guardian\Guardian;
 use Illuminate\Auth\Events\PasswordResetLinkSent;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Support\Facades\Password;
 
-class ForgotPassword
+class ForgotPassword implements HasValidationRules
 {
     use Concerns\HasRateLimiter;
 
@@ -27,7 +28,7 @@ class ForgotPassword
 
                 event(new PasswordResetLinkSent($user));
             },
-        ), $data['email'] ?? null, Guardian::getForgotPasswordMaxAttempts());
+        ), $data['email'] ?? null, Guardian::getForgotPasswordFeature()->getMaxAttempts());
     }
 
     public static function rules(): array

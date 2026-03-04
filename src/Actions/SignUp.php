@@ -2,6 +2,7 @@
 
 namespace Datalogix\Guardian\Actions;
 
+use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
 use Datalogix\Guardian\Enums\IdentifierKey;
 use Datalogix\Guardian\Guardian;
 use Illuminate\Auth\EloquentUserProvider;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
-class SignUp
+class SignUp implements HasValidationRules
 {
     use Concerns\HasRateLimiter;
 
@@ -29,7 +30,7 @@ class SignUp
             Guardian::auth()->login($user);
 
             Session::regenerate();
-        }, $data['email'] ?? null, Guardian::getSignUpMaxAttempts());
+        }, $data['email'] ?? null, Guardian::getSignUpFeature()->getMaxAttempts());
     }
 
     public static function rules(): array

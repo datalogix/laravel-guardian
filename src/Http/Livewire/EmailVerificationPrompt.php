@@ -4,6 +4,7 @@ namespace Datalogix\Guardian\Http\Livewire;
 
 use Datalogix\Guardian\Actions\SendEmailVerificationNotification;
 use Datalogix\Guardian\Guardian;
+use Datalogix\Guardian\Response\Redirector;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 
 class EmailVerificationPrompt extends Page
@@ -17,7 +18,7 @@ class EmailVerificationPrompt extends Page
         }
 
         if ($user->hasVerifiedEmail()) {
-            Guardian::redirect(intended: true);
+            Redirector::redirectIntended();
         }
     }
 
@@ -25,6 +26,6 @@ class EmailVerificationPrompt extends Page
     {
         $sent = app(SendEmailVerificationNotification::class)(Guardian::user());
 
-        return app(Guardian::getEmailVerificationPromptResponse(), ['sent' => $sent]);
+        return app(Guardian::getEmailVerificationPromptFeature()->getResponse(), ['sent' => $sent]);
     }
 }

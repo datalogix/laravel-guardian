@@ -13,9 +13,9 @@ class ResetPassword extends Page
 
     public string $email = '';
 
-    public string $new_password = '';
+    public string $password = '';
 
-    public string $new_password_confirmation = '';
+    public string $password_confirmation = '';
 
     public function mount(?string $token = null, ?string $email = null)
     {
@@ -29,6 +29,6 @@ class ResetPassword extends Page
 
         $status = app(ResetPasswordAction::class)($data);
 
-        return app(Guardian::getResetPasswordResponse(), ['status' => $status]);
+        return app(Guardian::getResetPasswordFeature()->getResponse(), ['status' => $status]);
     }
 }

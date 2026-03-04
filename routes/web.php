@@ -7,9 +7,9 @@ use Illuminate\Support\Facades\Route;
 Route::group([], function () {
     foreach (Guardian::getFortresses() as $fortress) {
         /** @var Fortress $fortress */
-        $domains = $fortress->getDomains();
+        $domains = $fortress->getDomains() ?: [null];
 
-        foreach ((empty($domains) ? [null] : $domains) as $domain) {
+        foreach ($domains as $domain) {
             Route::domain($domain)
                 ->middleware($fortress->getMiddleware())
                 ->name($fortress->generateRouteName(domain: $domain))

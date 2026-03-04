@@ -3,24 +3,17 @@
 namespace Datalogix\Guardian\Concerns;
 
 use Closure;
-use Datalogix\Guardian\Enums\Framework;
 use Datalogix\Guardian\Enums\Layout;
-use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
-use Datalogix\Guardian\Http\Responses\LoginResponse;
-use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Str;
+use Datalogix\Guardian\Features\LoginFeature;
 
 trait HasLogin
 {
-    protected string|Closure|array|false|null $loginRouteAction = null;
+    protected ?LoginFeature $loginFeature = null;
 
-    protected ?string $loginRouteSlug = null;
-
-    protected ?string $loginRouteName = null;
-
-    protected string|Closure|null $loginResponse = null;
-
-    protected int|false|null $loginMaxAttempts = null;
+    public function getLoginFeature(): LoginFeature
+    {
+        return $this->loginFeature ??= new LoginFeature($this);
+    }
 
     public function login(
         string|Closure|array|false|null $routeAction = null,
@@ -30,62 +23,21 @@ trait HasLogin
         int|false|null $maxAttempts = null,
         Layout|string|null $layout = null,
     ): static {
-        $this->loginRouteAction = $routeAction ?? match ($this->getFramework()) {
-            Framework::Livewire => \Datalogix\Guardian\Http\Livewire\Login::class,
-        };
-        $this->loginRouteSlug = $routeSlug ?? 'login';
-        $this->loginRouteName = $routeName ?? 'auth.login';
-        $this->loginResponse = $response ?? LoginResponse::class;
-        $this->loginMaxAttempts = $maxAttempts ?? 5;
-        $this->layoutForPage('login', $layout);
+        $this->getLoginFeature()->configure(
+            $routeAction,
+            $routeSlug,
+            $routeName,
+            $response,
+            $maxAttempts,
+            $layout,
+        );
 
         return $this;
     }
 
-    public function getLoginRouteAction(): string|Closure|array|false|null
-    {
-        return $this->loginRouteAction;
-    }
-
-    public function getLoginRouteSlug(): string
-    {
-        return Str::start($this->loginRouteSlug, '/');
-    }
-
-    public function getLoginRouteName(): ?string
-    {
-        return $this->loginRouteName;
-    }
-
-    public function getLoginResponse()
-    {
-        return value($this->loginResponse);
-    }
-
-    public function getLoginMaxAttempts(): int|false|null
-    {
-        return $this->loginMaxAttempts;
-    }
-
-    public function getLoginUrl(array $parameters = []): ?string
-    {
-        return $this->hasLogin()
-            ? $this->route($this->getLoginRouteName(), $parameters)
-            : null;
-    }
-
-    public function hasLogin(): bool
-    {
-        return filled($this->getLoginRouteAction());
-    }
-
     public function loginRoutes(): static
     {
-        if ($this->hasLogin()) {
-            Route::get($this->getLoginRouteSlug(), $this->getLoginRouteAction())
-                ->middleware(RedirectIfAuthenticated::class)
-                ->name($this->getLoginRouteName());
-        }
+        $this->getLoginFeature()->registerRoutes();
 
         return $this;
     }

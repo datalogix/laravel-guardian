@@ -11,6 +11,6 @@ class LogoutController
     {
         app(LogoutAction::class)();
 
-        return app(Guardian::getLogoutResponse());
+        return app(Guardian::getLogoutFeature()->getResponse());
     }
 }

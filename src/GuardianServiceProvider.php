@@ -2,6 +2,10 @@
 
 namespace Datalogix\Guardian;
 
+use Datalogix\Guardian\Enums\Framework;
+use Datalogix\Guardian\Framework\FrameworkResolver;
+use Datalogix\Guardian\Framework\InertiaComponentFactory;
+use Datalogix\Guardian\Framework\LivewireComponentFactory;
 use Datalogix\Guardian\Http\Middleware\Authenticate;
 use Datalogix\Guardian\Http\Middleware\DispatchServingGuardianEvent;
 use Datalogix\Guardian\Http\Middleware\SetUpFortress;
@@ -18,6 +22,14 @@ class GuardianServiceProvider extends ServiceProvider
         $this->app->scoped('guardian', fn () => new GuardianManager);
         $this->app->alias('guardian', GuardianManager::class);
         $this->app->singleton(FortressRegistry::class, fn () => new FortressRegistry);
+
+        $this->app->singleton(FrameworkResolver::class, function () {
+            $resolver = new FrameworkResolver;
+            $resolver->register(Framework::Inertia, new InertiaComponentFactory);
+            $resolver->register(Framework::Livewire, new LivewireComponentFactory);
+
+            return $resolver;
+        });
 
         app(Router::class)->aliasMiddleware('guardian', SetUpFortress::class);
     }

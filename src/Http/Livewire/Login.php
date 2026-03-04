@@ -29,6 +29,6 @@ class Login extends Page
 
         app(LoginAction::class)($data, $this->remember);
 
-        return app(Guardian::getLoginResponse());
+        return app(Guardian::getLoginFeature()->getResponse());
     }
 }

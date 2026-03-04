@@ -2,7 +2,7 @@
 
 namespace Datalogix\Guardian\Http\Responses;
 
-use Datalogix\Guardian\Guardian;
+use Datalogix\Guardian\Response\Notifier;
 use Illuminate\Contracts\Support\Responsable;
 
 class ForgotPasswordResponse implements Responsable
@@ -13,6 +13,6 @@ class ForgotPasswordResponse implements Responsable
 
     public function toResponse($request)
     {
-        Guardian::notify($this->status);
+        Notifier::notify($this->status);
     }
 }

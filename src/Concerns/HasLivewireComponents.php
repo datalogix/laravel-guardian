@@ -6,9 +6,8 @@ use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\Livewire;
-use Livewire\Mechanisms\ComponentRegistry;
 
-trait HasComponents
+trait HasLivewireComponents
 {
     protected array $livewireComponents = [];
 
@@ -23,6 +22,10 @@ trait HasComponents
         $components = array_filter(is_array($components) ? $components : func_get_args());
 
         foreach ($components as $component) {
+            if (! is_string($component)) {
+                continue;
+            }
+
             $this->queueLivewireComponentForRegistration($component);
         }
 
@@ -32,14 +35,14 @@ trait HasComponents
     protected function registerLivewireComponents(): void
     {
         $this->livewireComponents(
-            $this->getLoginRouteAction(),
-            $this->getLogoutRouteAction(),
-            $this->getForgotPasswordRouteAction(),
-            $this->getResetPasswordRouteAction(),
-            $this->getSignUpRouteAction(),
-            $this->getPasswordConfirmationRouteAction(),
-            $this->getEmailVerificationPromptRouteAction(),
-            $this->getEmailVerificationVerifyRouteAction(),
+            $this->getLoginFeature()->getRouteAction(),
+            $this->getLogoutFeature()->getRouteAction(),
+            $this->getForgotPasswordFeature()->getRouteAction(),
+            $this->getResetPasswordFeature()->getRouteAction(),
+            $this->getSignUpFeature()->getRouteAction(),
+            $this->getPasswordConfirmationFeature()->getRouteAction(),
+            $this->getEmailVerificationPromptFeature()->getRouteAction(),
+            $this->getEmailVerificationVerifyFeature()->getRouteAction(),
         );
 
         foreach ($this->livewireComponents as $componentName => $componentClass) {
@@ -53,7 +56,11 @@ trait HasComponents
             return;
         }
 
-        $componentName = app(ComponentRegistry::class)->getName($component);
+        $componentRegistry = 'Livewire\\Mechanisms\\ComponentRegistry';
+
+        $componentName = class_exists($componentRegistry)
+            ? app($componentRegistry)->getName($component)
+            : app('livewire.factory')->resolveComponentName($component);
 
         $this->livewireComponents[$componentName] = $component;
     }

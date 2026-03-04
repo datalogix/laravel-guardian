@@ -26,6 +26,6 @@ class Authenticate extends BaseAuthenticate
 
     protected function redirectTo($request): ?string
     {
-        return Guardian::getLoginUrl();
+        return Guardian::getLoginFeature()->getUrl();
     }
 }

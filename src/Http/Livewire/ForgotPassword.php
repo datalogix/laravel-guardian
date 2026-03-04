@@ -15,6 +15,6 @@ class ForgotPassword extends Page
 
         $status = app(ForgotPasswordAction::class)($data);
 
-        return app(Guardian::getForgotPasswordResponse(), ['status' => $status]);
+        return app(Guardian::getForgotPasswordFeature()->getResponse(), ['status' => $status]);
     }
 }

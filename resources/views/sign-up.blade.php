@@ -2,7 +2,7 @@
 use Datalogix\Guardian\Enums\IdentifierKey;
 @endphp
 
-<tk:page.auth.sign-up :login="guardian()->getLoginUrl()">
+<tk:page.auth.sign-up :login="guardian()->getLoginFeature()->getUrl()">
     @if ($identifierKey !== IdentifierKey::Email)
         <tk:input
             name="username"

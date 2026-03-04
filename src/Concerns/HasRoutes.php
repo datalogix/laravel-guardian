@@ -47,20 +47,20 @@ trait HasRoutes
         return $this;
     }
 
-    public function routes(?Closure $routes, ?bool $authenticated = null): static
+    public function routes(Closure $callback, ?bool $requiresAuth = null): static
     {
-        if ($authenticated) {
-            return $this->authenticatedRoutes($routes);
+        if ($requiresAuth) {
+            return $this->authenticatedRoutes($callback);
         }
 
-        $this->routes[] = $routes;
+        $this->routes[] = $callback;
 
         return $this;
     }
 
-    public function authenticatedRoutes(Closure $routes): static
+    public function authenticatedRoutes(Closure $callback): static
     {
-        $this->authenticatedRoutes[] = $routes;
+        $this->authenticatedRoutes[] = $callback;
 
         return $this;
     }
@@ -70,44 +70,30 @@ trait HasRoutes
         return route($this->generateRouteName($name), $parameters, $absolute);
     }
 
-    public function notify(string $message, ?string $type = null): void
-    {
-        app()->bound('tallkit')
-            ? app('tallkit')->alert($message, $type)
-            : session()->flash('status', __($message));
-    }
-
-    public function redirect(?string $path = null, bool $intended = false, bool $navigate = true)
-    {
-        $path ??= $this->getUrl();
-        $livewire = app('livewire')?->current();
-
-        if ($livewire) {
-            return $intended
-                ? $livewire->redirectIntended($path, navigate: $navigate)
-                : $livewire->redirect($path, navigate: $navigate);
-        }
-
-        return $intended
-            ? redirect()->intended($path)
-            : redirect()->to($path);
-    }
-
-    public function generateRouteName(string $name = '', ?string $domain = ''): string
+    public function generateRouteName(string $name = '', ?string $domain = null): string
     {
         if ($this->getId() === 'default') {
             return $name;
         }
 
-        if (count($this->domains) > 1 && filled($domain)) {
-            $domain = "{$domain}.";
-        }
-
-        if (count($this->domains) > 1 && $domain === '') {
-            $domain = Guardian::getCurrentDomain(Arr::first($this->domains)).'.';
-        }
+        $domain = $this->resolveDomainForRouteName($domain);
 
         return "guardian.{$this->getId()}.{$domain}{$name}";
+    }
+
+    protected function resolveDomainForRouteName(?string $domain): string
+    {
+        if (count($this->domains) <= 1) {
+            return '';
+        }
+
+        if (filled($domain)) {
+            return "{$domain}.";
+        }
+
+        $resolvedDomain = Guardian::getCurrentDomain(Arr::first($this->domains));
+
+        return "{$resolvedDomain}.";
     }
 
     public function getRoutes(): array
@@ -137,8 +123,8 @@ trait HasRoutes
 
     public function getUrl(): ?string
     {
-        if (! $this->auth()->check() && $this->hasLogin()) {
-            return $this->getLoginUrl();
+        if (! $this->auth()->check() && $this->getLoginFeature()->hasFeature()) {
+            return $this->getLoginFeature()->getUrl();
         }
 
         return url($this->getPath());
@@ -146,16 +132,16 @@ trait HasRoutes
 
     public function registerRoutes(): static
     {
-        foreach ($this->getRoutes() as $routes) {
-            $routes($this);
+        foreach ($this->getRoutes() as $callback) {
+            $callback($this);
         }
 
         Route::middleware([
             ...$this->getAuthMiddleware(),
             ...($this->isEmailVerificationRequired() ? [$this->getEmailVerifiedMiddleware()] : []),
         ])->group(function () {
-            foreach ($this->getAuthenticatedRoutes() as $routes) {
-                $routes($this);
+            foreach ($this->getAuthenticatedRoutes() as $callback) {
+                $callback($this);
             }
         });
 
