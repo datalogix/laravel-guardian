@@ -22,13 +22,13 @@ trait HasTwoFactor
 
     protected ?TwoFactorSetupFeature $twoFactorSetupFeature = null;
 
-    protected int|false|null $twoFactorChallengeTtl = 600;
+    protected int|false|null $twoFactorChallengeTtl = null;
 
-    protected int|false|null $twoFactorSetupTtl = 600;
+    protected int|false|null $twoFactorSetupTtl = null;
 
-    protected bool $rememberTwoFactorOnDevice = false;
+    protected ?bool $rememberTwoFactorOnDevice = null;
 
-    protected int $rememberTwoFactorForDays = 30;
+    protected int $rememberTwoFactorForDays = null;
 
     protected ?Closure $twoFactorRequirementPolicy = null;
 
@@ -56,6 +56,13 @@ trait HasTwoFactor
         ?int $rememberForDays = null,
         ?Closure $requireWhen = null,
         ?int $gracePeriodDays = null,
+        string|Closure|array|false|null $setupRouteAction = null,
+        ?string $setupRouteSlug = null,
+        ?string $setupRouteName = null,
+        string|Closure|null $setupResponse = null,
+        int|false|null $setupMaxAttempts = null,
+        Layout|string|null $setupLayout = null,
+        int|false|null $setupTtl = null,
     ): static {
         $this->getTwoFactorChallengeFeature()->configure(
             $challengeRouteAction,
@@ -66,26 +73,6 @@ trait HasTwoFactor
             $challengeLayout,
         );
 
-        $this->twoFactorChallengeTtl = $challengeTtl ?? $this->twoFactorChallengeTtl;
-        $this->rememberTwoFactorOnDevice = $rememberOnDevice ?? $this->rememberTwoFactorOnDevice;
-        $this->rememberTwoFactorForDays = $rememberForDays ?? $this->rememberTwoFactorForDays;
-        $this->twoFactorRequirementPolicy = $requireWhen ?? $this->twoFactorRequirementPolicy;
-        $this->twoFactorGracePeriodDays = $gracePeriodDays ?? $this->twoFactorGracePeriodDays;
-
-        $this->twoFactorSetup();
-
-        return $this;
-    }
-
-    public function twoFactorSetup(
-        string|Closure|array|false|null $setupRouteAction = null,
-        ?string $setupRouteSlug = null,
-        ?string $setupRouteName = null,
-        string|Closure|null $setupResponse = null,
-        int|false|null $setupMaxAttempts = null,
-        Layout|string|null $setupLayout = null,
-        int|false|null $setupTtl = null,
-    ): static {
         $this->getTwoFactorSetupFeature()->configure(
             $setupRouteAction,
             $setupRouteSlug,
@@ -95,7 +82,12 @@ trait HasTwoFactor
             $setupLayout,
         );
 
-        $this->twoFactorSetupTtl = $setupTtl ?? $this->twoFactorSetupTtl;
+        $this->twoFactorChallengeTtl = $challengeTtl ?? 600;
+        $this->rememberTwoFactorOnDevice = $rememberOnDevice ?? false;
+        $this->rememberTwoFactorForDays = $rememberForDays ?? 30;
+        $this->twoFactorRequirementPolicy = $requireWhen;
+        $this->twoFactorGracePeriodDays = $gracePeriodDays;
+        $this->twoFactorSetupTtl = $setupTtl ?? 600;
 
         return $this;
     }
