@@ -36,6 +36,7 @@
         "illuminate/support": "^11.0|^12.0",
         "illuminate/validation": "^11.0|^12.0",
         "illuminate/view": "^11.0|^12.0",
+        "laravel/socialite": "^5.23",
         "pragmarx/google2fa": "^8.0"
     },
     "require-dev": {

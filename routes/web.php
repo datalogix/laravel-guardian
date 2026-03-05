@@ -18,6 +18,7 @@ Route::group([], function () {
                     $fortress
                         ->registerRoutes()
                         ->loginRoutes()
+                        ->oauthRoutes()
                         ->twoFactorRoutes()
                         ->logoutRoutes()
                         ->passwordResetRoutes()

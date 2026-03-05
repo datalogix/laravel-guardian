@@ -18,6 +18,7 @@ class Fortress
     use Concerns\HasLogout;
     use Concerns\HasMiddleware;
     use Concerns\HasModes;
+    use Concerns\HasOAuth;
     use Concerns\HasPasswordConfirmation;
     use Concerns\HasPasswordReset;
     use Concerns\HasRoutes;
