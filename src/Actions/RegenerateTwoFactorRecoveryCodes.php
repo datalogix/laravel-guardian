@@ -3,11 +3,11 @@
 namespace Datalogix\Guardian\Actions;
 
 use Datalogix\Guardian\Events\TwoFactorRecoveryCodesRegenerated;
+use Datalogix\Guardian\Exceptions\PasswordConfirmationException;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\RecoveryCodes;
 use Datalogix\Guardian\Support\TwoFactorUser;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Validation\ValidationException;
 
 class RegenerateTwoFactorRecoveryCodes
 {
@@ -17,9 +17,7 @@ class RegenerateTwoFactorRecoveryCodes
     public function __invoke(object $user): array
     {
         if (! $this->passwordWasRecentlyConfirmed()) {
-            throw ValidationException::withMessages([
-                'password' => [__('Please confirm your password before regenerating two-factor recovery codes.')],
-            ]);
+            throw PasswordConfirmationException::requiredForRegeneratingRecoveryCodes();
         }
 
         $manager = app(TwoFactorUser::class);

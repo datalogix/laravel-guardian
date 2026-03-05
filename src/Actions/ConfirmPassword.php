@@ -3,10 +3,10 @@
 namespace Datalogix\Guardian\Actions;
 
 use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
+use Datalogix\Guardian\Exceptions\PasswordConfirmationException;
 use Datalogix\Guardian\Guardian;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rules\Password as PasswordRule;
-use Illuminate\Validation\ValidationException;
 
 class ConfirmPassword implements HasValidationRules
 {
@@ -18,14 +18,14 @@ class ConfirmPassword implements HasValidationRules
         $user = $auth->user();
 
         if (! $user) {
-            throw ValidationException::withMessages(['password' => [__('auth.password')]]);
+            throw PasswordConfirmationException::invalid();
         }
 
         $this->throttleAction(function () use ($data, $auth, $user) {
             $data['email'] = $user->email;
 
             if (! $auth->validate($data)) {
-                throw ValidationException::withMessages(['password' => [__('auth.password')]]);
+                throw PasswordConfirmationException::invalid();
             }
 
             Session::put('auth.password_confirmed_at', time());

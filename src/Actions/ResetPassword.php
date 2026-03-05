@@ -4,6 +4,7 @@ namespace Datalogix\Guardian\Actions;
 
 use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
 use Datalogix\Guardian\Guardian;
+use Datalogix\Guardian\Exceptions\ResetPasswordException;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
@@ -12,7 +13,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password as PasswordRule;
-use Illuminate\Validation\ValidationException;
 
 class ResetPassword implements HasValidationRules
 {
@@ -45,7 +45,7 @@ class ResetPassword implements HasValidationRules
             }
 
             if ($status !== Password::PASSWORD_RESET) {
-                throw ValidationException::withMessages(['email' => [__($status)]]);
+                throw ResetPasswordException::forStatus($status);
             }
 
             return $status;

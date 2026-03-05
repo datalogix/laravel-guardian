@@ -3,19 +3,17 @@
 namespace Datalogix\Guardian\Actions;
 
 use Datalogix\Guardian\Events\TwoFactorDisabled;
+use Datalogix\Guardian\Exceptions\PasswordConfirmationException;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\TwoFactorUser;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Validation\ValidationException;
 
 class DisableTwoFactor
 {
     public function __invoke(object $user): void
     {
         if (! $this->passwordWasRecentlyConfirmed()) {
-            throw ValidationException::withMessages([
-                'password' => [__('Please confirm your password before disabling two-factor authentication.')],
-            ]);
+            throw PasswordConfirmationException::requiredForDisablingTwoFactor();
         }
 
         $fortress = Guardian::getCurrentOrDefaultFortress();
