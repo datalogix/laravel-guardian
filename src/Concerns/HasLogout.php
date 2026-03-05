@@ -34,7 +34,9 @@ trait HasLogout
 
     public function logoutRoutes(): static
     {
-        $this->getLogoutFeature()->registerRoutes();
+        if ($this->getLogoutFeature()->hasFeature()) {
+            $this->getLogoutFeature()->registerRoutes();
+        }
 
         return $this;
     }

@@ -15,7 +15,7 @@ class SendEmailVerificationNotification
     public function __invoke(Model $user)
     {
         return $this->throttleAction(function () use ($user) {
-            if (! Guardian::hasEmailVerification()) {
+            if (! Guardian::getEmailVerificationVerifyFeature()->hasFeature()) {
                 return;
             }
 

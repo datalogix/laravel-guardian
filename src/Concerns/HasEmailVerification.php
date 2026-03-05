@@ -9,7 +9,6 @@ use Datalogix\Guardian\Features\EmailVerificationVerifyFeature;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\URL;
 
 trait HasEmailVerification
@@ -100,23 +99,14 @@ trait HasEmailVerification
             : null;
     }
 
-    public function hasEmailVerification(): bool
-    {
-        return $this->getEmailVerificationPromptFeature()->hasFeature()
-            && $this->getEmailVerificationVerifyFeature()->hasFeature();
-    }
-
     public function emailVerificationRoutes(): static
     {
-        if ($this->hasEmailVerification()) {
-            Route::middleware($this->getAuthMiddleware())->group(function () {
-                Route::get($this->getEmailVerificationPromptFeature()->getRouteSlug(), $this->getEmailVerificationPromptFeature()->getRouteAction())
-                    ->name($this->getEmailVerificationPromptFeature()->getRouteName());
+        if ($this->getEmailVerificationPromptFeature()->hasFeature()) {
+            $this->getEmailVerificationPromptFeature()->registerRoutes();
+        }
 
-                Route::get($this->getEmailVerificationVerifyFeature()->getRouteSlug().'/{id}/{hash}', $this->getEmailVerificationVerifyFeature()->getRouteAction())
-                    ->middleware(['signed', 'throttle:6,1'])
-                    ->name($this->getEmailVerificationVerifyFeature()->getRouteName());
-            });
+        if ($this->getEmailVerificationVerifyFeature()->hasFeature()) {
+            $this->getEmailVerificationVerifyFeature()->registerRoutes();
         }
 
         return $this;

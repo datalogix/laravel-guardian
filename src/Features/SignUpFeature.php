@@ -40,10 +40,8 @@ class SignUpFeature extends Feature
 
     public function registerRoutes(): void
     {
-        if ($this->hasFeature()) {
-            Route::get($this->getRouteSlug(), $this->getRouteAction())
-                ->middleware(RedirectIfAuthenticated::class)
-                ->name($this->getRouteName());
-        }
+        Route::get($this->getRouteSlug(), $this->getRouteAction())
+            ->middleware(RedirectIfAuthenticated::class)
+            ->name($this->getRouteName());
     }
 }

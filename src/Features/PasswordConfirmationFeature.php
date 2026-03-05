@@ -39,9 +39,7 @@ class PasswordConfirmationFeature extends Feature
 
     public function registerRoutes(): void
     {
-        if ($this->hasFeature()) {
-            Route::get($this->getRouteSlug(), $this->getRouteAction())
-                ->name($this->getRouteName());
-        }
+        Route::get($this->getRouteSlug(), $this->getRouteAction())
+            ->name($this->getRouteName());
     }
 }

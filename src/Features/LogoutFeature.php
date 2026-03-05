@@ -40,10 +40,8 @@ class LogoutFeature extends Feature
 
     public function registerRoutes(): void
     {
-        if ($this->hasFeature()) {
-            Route::any($this->getRouteSlug(), $this->getRouteAction())
-                ->middleware($this->fortress->getAuthMiddleware())
-                ->name($this->getRouteName());
-        }
+        Route::any($this->getRouteSlug(), $this->getRouteAction())
+            ->middleware($this->fortress->getAuthMiddleware())
+            ->name($this->getRouteName());
     }
 }

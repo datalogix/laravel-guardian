@@ -429,8 +429,13 @@ trait HasTwoFactor
 
     public function twoFactorRoutes(): static
     {
-        $this->getTwoFactorSetupFeature()->registerRoutes();
-        $this->getTwoFactorChallengeFeature()->registerRoutes();
+        if ($this->getTwoFactorSetupFeature()->hasFeature()) {
+            $this->getTwoFactorSetupFeature()->registerRoutes();
+        }
+
+        if ($this->getTwoFactorChallengeFeature()->hasFeature()) {
+            $this->getTwoFactorChallengeFeature()->registerRoutes();
+        }
 
         return $this;
     }

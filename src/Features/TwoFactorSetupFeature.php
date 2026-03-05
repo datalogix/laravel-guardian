@@ -39,10 +39,8 @@ class TwoFactorSetupFeature extends Feature
 
     public function registerRoutes(): void
     {
-        if ($this->hasFeature()) {
-            Route::get($this->getRouteSlug(), $this->getRouteAction())
-                ->middleware($this->fortress->getAuthMiddleware())
-                ->name($this->getRouteName());
-        }
+        Route::get($this->getRouteSlug(), $this->getRouteAction())
+            ->middleware($this->fortress->getAuthMiddleware())
+            ->name($this->getRouteName());
     }
 }

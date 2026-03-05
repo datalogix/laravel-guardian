@@ -86,8 +86,13 @@ trait HasPasswordReset
 
     public function passwordResetRoutes(): static
     {
-        $this->getForgotPasswordFeature()->registerRoutes();
-        $this->getResetPasswordFeature()->registerRoutes();
+        if ($this->getForgotPasswordFeature()->hasFeature()) {
+            $this->getForgotPasswordFeature()->registerRoutes();
+        }
+
+        if ($this->getResetPasswordFeature()->hasFeature()) {
+            $this->getResetPasswordFeature()->registerRoutes();
+        }
 
         return $this;
     }

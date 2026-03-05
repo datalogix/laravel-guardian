@@ -37,7 +37,9 @@ trait HasLogin
 
     public function loginRoutes(): static
     {
-        $this->getLoginFeature()->registerRoutes();
+        if ($this->getLoginFeature()->hasFeature()) {
+            $this->getLoginFeature()->registerRoutes();
+        }
 
         return $this;
     }
