@@ -28,7 +28,7 @@ trait HasTwoFactor
 
     protected ?bool $rememberTwoFactorOnDevice = null;
 
-    protected int $rememberTwoFactorForDays = null;
+    protected ?int $rememberTwoFactorForDays = null;
 
     protected ?Closure $twoFactorRequirementPolicy = null;
 
