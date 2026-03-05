@@ -19,6 +19,8 @@ class EmailVerificationPrompt extends Page
 
         if ($user->hasVerifiedEmail()) {
             Redirector::redirectIntended();
+
+            return;
         }
     }
 

@@ -41,7 +41,9 @@ class TwoFactorSetup extends Page
     public function mount(): void
     {
         if (! Guardian::isAuthenticated()) {
-            return Redirector::redirectToLogin(intended: true);
+            Redirector::redirectToLogin(intended: true);
+
+            return;
         }
 
         $this->syncState();

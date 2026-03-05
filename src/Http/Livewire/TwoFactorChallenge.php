@@ -16,6 +16,8 @@ class TwoFactorChallenge extends Page
     {
         if (! Guardian::hasPendingTwoFactorChallenge()) {
             Redirector::redirectToLogin();
+
+            return;
         }
     }
 
