@@ -10,6 +10,8 @@ class Logout
     public function __invoke()
     {
         Guardian::auth()->logout();
+        Guardian::clearTwoFactorSetup();
+        Guardian::clearTwoFactorChallenge();
 
         Session::invalidate();
         Session::regenerateToken();

@@ -41,9 +41,8 @@ class EmailVerificationVerifyFeature extends Feature
     public function registerRoutes(): void
     {
         if ($this->hasFeature()) {
-            Route::middleware($this->fortress->getAuthMiddleware())
-                ->get($this->getRouteSlug().'/{id}/{hash}', $this->getRouteAction())
-                ->middleware(['signed', 'throttle:6,1'])
+            Route::get($this->getRouteSlug().'/{id}/{hash}', $this->getRouteAction())
+                ->middleware($this->fortress->getAuthMiddleware(), 'signed', 'throttle:6,1')
                 ->name($this->getRouteName());
         }
     }

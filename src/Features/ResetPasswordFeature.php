@@ -41,10 +41,9 @@ class ResetPasswordFeature extends Feature
     public function registerRoutes(): void
     {
         if ($this->hasFeature()) {
-            Route::middleware([RedirectIfAuthenticated::class, 'signed'])->group(function () {
-                Route::get($this->getRouteSlug().'/{token?}', $this->getRouteAction())
-                    ->name($this->getRouteName());
-            });
+            Route::get($this->getRouteSlug().'/{token?}', $this->getRouteAction())
+                ->middleware(RedirectIfAuthenticated::class, 'signed')
+                ->name($this->getRouteName());
         }
     }
 }

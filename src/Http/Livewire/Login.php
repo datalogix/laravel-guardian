@@ -27,7 +27,11 @@ class Login extends Page
     {
         $data = $this->validate(LoginAction::rules());
 
-        app(LoginAction::class)($data, $this->remember);
+        $requiresTwoFactorChallenge = app(LoginAction::class)($data, $this->remember);
+
+        if ($requiresTwoFactorChallenge) {
+            return app(Guardian::getTwoFactorChallengeFeature()->getResponse());
+        }
 
         return app(Guardian::getLoginFeature()->getResponse());
     }

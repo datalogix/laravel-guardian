@@ -43,6 +43,8 @@ trait HasLivewireComponents
             $this->getPasswordConfirmationFeature()->getRouteAction(),
             $this->getEmailVerificationPromptFeature()->getRouteAction(),
             $this->getEmailVerificationVerifyFeature()->getRouteAction(),
+            $this->getTwoFactorSetupFeature()->getRouteAction(),
+            $this->getTwoFactorChallengeFeature()->getRouteAction(),
         );
 
         foreach ($this->livewireComponents as $componentName => $componentClass) {

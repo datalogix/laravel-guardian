@@ -13,6 +13,8 @@ class LivewireComponentFactory implements ComponentFactory
             'reset-password' => \Datalogix\Guardian\Http\Livewire\ResetPassword::class,
             'confirm-password' => \Datalogix\Guardian\Http\Livewire\ConfirmPassword::class,
             'email-verification-prompt' => \Datalogix\Guardian\Http\Livewire\EmailVerificationPrompt::class,
+            'two-factor-setup' => \Datalogix\Guardian\Http\Livewire\TwoFactorSetup::class,
+            'two-factor-challenge' => \Datalogix\Guardian\Http\Livewire\TwoFactorChallenge::class,
             default => throw new \InvalidArgumentException("Unknown component [{$componentName}]."),
         };
     }

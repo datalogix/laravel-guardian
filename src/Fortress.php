@@ -22,6 +22,7 @@ class Fortress
     use Concerns\HasPasswordReset;
     use Concerns\HasRoutes;
     use Concerns\HasSignUp;
+    use Concerns\HasTwoFactor;
 
     public static function make(): static
     {

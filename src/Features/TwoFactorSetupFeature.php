@@ -2,29 +2,29 @@
 
 namespace Datalogix\Guardian\Features;
 
-use Datalogix\Guardian\Http\Responses\EmailVerificationPromptResponse;
+use Datalogix\Guardian\Http\Responses\TwoFactorSetupResponse;
 use Illuminate\Support\Facades\Route;
 
-class EmailVerificationPromptFeature extends Feature
+class TwoFactorSetupFeature extends Feature
 {
     protected function defaultRouteAction()
     {
-        return $this->resolveComponent('email-verification-prompt');
+        return $this->resolveComponent('two-factor-setup');
     }
 
     protected function defaultRouteSlug(): string
     {
-        return 'email-verification/prompt';
+        return 'two-factor/setup';
     }
 
     protected function defaultRouteName(): string
     {
-        return 'auth.email-verification.prompt';
+        return 'auth.two-factor.setup';
     }
 
     protected function defaultResponse(): string
     {
-        return EmailVerificationPromptResponse::class;
+        return TwoFactorSetupResponse::class;
     }
 
     protected function defaultMaxAttempts(): int|false
@@ -34,7 +34,7 @@ class EmailVerificationPromptFeature extends Feature
 
     protected function pageName(): string
     {
-        return 'email-verification-prompt';
+        return 'two-factor-setup';
     }
 
     public function registerRoutes(): void

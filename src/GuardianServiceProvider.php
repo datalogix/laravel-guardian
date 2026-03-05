@@ -36,13 +36,14 @@ class GuardianServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $this->loadViewsFrom(__DIR__.'/../resources/views', 'guardian');
+
         app()->booted(function () {
             app(FortressRegistry::class)->validate();
 
             $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
         });
-
-        $this->loadViewsFrom(__DIR__.'/../resources/views', 'guardian');
 
         if (class_exists(Livewire::class)) {
             Livewire::addPersistentMiddleware([
@@ -56,6 +57,7 @@ class GuardianServiceProvider extends ServiceProvider
             $this->commands([
                 Commands\CacheComponentsCommand::class,
                 Commands\ClearCachedComponentsCommand::class,
+                Commands\PruneTrustedDevicesCommand::class,
             ]);
         }
 

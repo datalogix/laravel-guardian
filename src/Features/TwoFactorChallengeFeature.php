@@ -2,29 +2,30 @@
 
 namespace Datalogix\Guardian\Features;
 
-use Datalogix\Guardian\Http\Responses\EmailVerificationPromptResponse;
+use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
+use Datalogix\Guardian\Http\Responses\TwoFactorChallengeResponse;
 use Illuminate\Support\Facades\Route;
 
-class EmailVerificationPromptFeature extends Feature
+class TwoFactorChallengeFeature extends Feature
 {
     protected function defaultRouteAction()
     {
-        return $this->resolveComponent('email-verification-prompt');
+        return $this->resolveComponent('two-factor-challenge');
     }
 
     protected function defaultRouteSlug(): string
     {
-        return 'email-verification/prompt';
+        return 'two-factor/challenge';
     }
 
     protected function defaultRouteName(): string
     {
-        return 'auth.email-verification.prompt';
+        return 'auth.two-factor.challenge';
     }
 
     protected function defaultResponse(): string
     {
-        return EmailVerificationPromptResponse::class;
+        return TwoFactorChallengeResponse::class;
     }
 
     protected function defaultMaxAttempts(): int|false
@@ -34,14 +35,14 @@ class EmailVerificationPromptFeature extends Feature
 
     protected function pageName(): string
     {
-        return 'email-verification-prompt';
+        return 'two-factor-challenge';
     }
 
     public function registerRoutes(): void
     {
         if ($this->hasFeature()) {
             Route::get($this->getRouteSlug(), $this->getRouteAction())
-                ->middleware($this->fortress->getAuthMiddleware())
+                ->middleware(RedirectIfAuthenticated::class)
                 ->name($this->getRouteName());
         }
     }
