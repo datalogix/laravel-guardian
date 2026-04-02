@@ -17,9 +17,9 @@ return new class extends Migration
 
         Schema::create('two_factor_trusted_devices', function (Blueprint $table) {
             $table->id();
-            $table->string('fortress_id')->index();
-            $table->string('auth_guard')->nullable()->index();
-            $table->morphs('authenticatable');
+            $table->string('fortress_id', 20)->index();
+            $table->string('auth_guard', 20)->nullable()->index();
+            $table->morphs('authenticatable', 'guardian_two_factor_authenticatable_idx');
             $table->string('name')->nullable();
             $table->string('ip_address', 45)->nullable();
             $table->text('user_agent')->nullable();
@@ -29,7 +29,7 @@ return new class extends Migration
             $table->timestamp('revoked_at')->nullable()->index();
             $table->timestamps();
 
-            $table->index(['fortress_id', 'auth_guard', 'authenticatable_type', 'authenticatable_id'], 'guardian_2fa_trusted_devices_lookup');
+            $table->index(['fortress_id', 'auth_guard', 'authenticatable_type', 'authenticatable_id'], 'guardian_two_factor_lookup');
         });
     }
 

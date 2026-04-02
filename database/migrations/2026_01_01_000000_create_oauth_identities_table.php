@@ -17,11 +17,11 @@ return new class extends Migration
 
         Schema::create('oauth_identities', function (Blueprint $table) {
             $table->id();
-            $table->string('fortress_id')->index();
-            $table->string('auth_guard')->nullable()->index();
-            $table->morphs('authenticatable');
-            $table->string('provider')->index();
-            $table->string('provider_user_id');
+            $table->string('fortress_id', 20)->index();
+            $table->string('auth_guard', 20)->nullable()->index();
+            $table->morphs('authenticatable', 'guardian_oauth_authenticatable_idx');
+            $table->string('provider', 20)->index();
+            $table->string('provider_user_id', 191);
             $table->string('email')->nullable()->index();
             $table->string('name')->nullable();
             $table->text('avatar')->nullable();
@@ -31,8 +31,8 @@ return new class extends Migration
             $table->timestamp('last_used_at')->nullable();
             $table->timestamps();
 
-            $table->unique(['fortress_id', 'auth_guard', 'provider', 'provider_user_id'], 'guardian_oauth_identity_unique_provider');
-            $table->unique(['fortress_id', 'auth_guard', 'authenticatable_type', 'authenticatable_id', 'provider'], 'guardian_oauth_identity_unique_user_provider');
+            $table->unique(['fortress_id', 'auth_guard', 'provider', 'provider_user_id'], 'guardian_oauth_provider');
+            $table->unique(['fortress_id', 'auth_guard', 'authenticatable_type', 'authenticatable_id', 'provider'], 'guardian_oauth_lookup');
         });
     }
 
