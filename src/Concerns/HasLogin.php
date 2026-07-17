@@ -43,4 +43,9 @@ trait HasLogin
 
         return $this;
     }
+
+    public function loginUrl(): ?string
+    {
+        return $this->getLoginFeature()->getUrl();
+    }
 }

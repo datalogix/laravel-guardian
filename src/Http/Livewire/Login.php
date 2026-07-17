@@ -3,6 +3,7 @@
 namespace Datalogix\Guardian\Http\Livewire;
 
 use Datalogix\Guardian\Actions\Login as LoginAction;
+use Datalogix\Guardian\Enums\AuthFlowResult;
 use Datalogix\Guardian\Enums\IdentifierKey;
 use Datalogix\Guardian\Guardian;
 use Livewire\Attributes\Locked;
@@ -29,7 +30,7 @@ class Login extends Page
 
         $requiresTwoFactorChallenge = app(LoginAction::class)($data, $this->remember);
 
-        if ($requiresTwoFactorChallenge) {
+        if ($requiresTwoFactorChallenge === AuthFlowResult::ChallengeRequired) {
             return app(Guardian::getTwoFactorChallengeFeature()->getResponse());
         }
 

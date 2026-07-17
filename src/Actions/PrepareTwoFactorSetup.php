@@ -2,18 +2,21 @@
 
 namespace Datalogix\Guardian\Actions;
 
+use Datalogix\Guardian\Enums\TwoFactorMethod;
 use Datalogix\Guardian\Guardian;
-use Datalogix\Guardian\Support\QrCode;
-use Datalogix\Guardian\Support\Totp;
+use Datalogix\Guardian\Support\TwoFactor\QrCode;
+use Datalogix\Guardian\Support\TwoFactor\Totp;
 use Exception;
 
 class PrepareTwoFactorSetup
 {
-    public function __invoke(object $user): array
+    public function __invoke(object $user, ?TwoFactorMethod $method = null): array
     {
+        $method ??= Guardian::getTwoFactorMethod();
+
         $secret = app(Totp::class)->generateSecret();
 
-        Guardian::startTwoFactorSetup($secret);
+        Guardian::startTwoFactorSetup($secret, $method);
 
         $account = 'user';
 
@@ -39,10 +42,15 @@ class PrepareTwoFactorSetup
 
         $uri = app(Totp::class)->makeOtpAuthUri($secret, $account);
 
+        if ($user instanceof \Illuminate\Database\Eloquent\Model && $method !== TwoFactorMethod::Totp) {
+            Guardian::dispatchTwoFactorCode($user, $method, app(Totp::class)->currentCode($secret), 'setup');
+        }
+
         return [
             'secret' => $secret,
             'uri' => $uri,
             'qr_svg' => app(QrCode::class)->svg($uri),
+            'method' => $method->value,
         ];
     }
 }

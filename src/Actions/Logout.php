@@ -9,9 +9,11 @@ class Logout
 {
     public function __invoke()
     {
+        Guardian::forgetRememberedTwoFactorDevice();
         Guardian::auth()->logout();
         Guardian::clearTwoFactorSetup();
         Guardian::clearTwoFactorChallenge();
+        Guardian::clearPendingTwoFactorSetup();
 
         Session::invalidate();
         Session::regenerateToken();

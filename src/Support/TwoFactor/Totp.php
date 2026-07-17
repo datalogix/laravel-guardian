@@ -1,6 +1,6 @@
 <?php
 
-namespace Datalogix\Guardian\Support;
+namespace Datalogix\Guardian\Support\TwoFactor;
 
 use PragmaRX\Google2FA\Google2FA;
 
@@ -30,5 +30,10 @@ class Totp
         }
 
         return app(Google2FA::class)->verifyKey($secret, $normalizedCode, $window);
+    }
+
+    public function currentCode(string $secret): string
+    {
+        return str_pad((string) app(Google2FA::class)->getCurrentOtp($secret), 6, '0', STR_PAD_LEFT);
     }
 }

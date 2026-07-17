@@ -1,6 +1,6 @@
 <?php
 
-namespace Datalogix\Guardian\Support;
+namespace Datalogix\Guardian\Support\OAuth;
 
 use Datalogix\Guardian\Fortress;
 use Illuminate\Database\Eloquent\Model;

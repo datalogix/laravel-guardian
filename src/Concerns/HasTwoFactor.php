@@ -4,16 +4,18 @@ namespace Datalogix\Guardian\Concerns;
 
 use Closure;
 use Datalogix\Guardian\Enums\Layout;
-use Datalogix\Guardian\Events\TwoFactorTrustedDeviceRemembered;
-use Datalogix\Guardian\Events\TwoFactorTrustedDeviceRevoked;
-use Datalogix\Guardian\Events\TwoFactorTrustedDevicesRevokedAll;
+use Datalogix\Guardian\Enums\TwoFactorMethod;
+use Datalogix\Guardian\Exceptions\TwoFactorChallengeException;
 use Datalogix\Guardian\Features\TwoFactorChallengeFeature;
 use Datalogix\Guardian\Features\TwoFactorSetupFeature;
-use Datalogix\Guardian\Support\TrustedDevices;
-use Datalogix\Guardian\Support\TwoFactorUser;
+use Datalogix\Guardian\Support\TwoFactor\Totp;
+use Datalogix\Guardian\Support\TwoFactor\TwoFactorDeliveryManager;
+use Datalogix\Guardian\Support\TwoFactor\TwoFactorSessionManager;
+use Datalogix\Guardian\Support\TwoFactor\TwoFactorTrustedDeviceManager;
+use Datalogix\Guardian\Support\TwoFactor\TwoFactorUser;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 
 trait HasTwoFactor
@@ -26,13 +28,27 @@ trait HasTwoFactor
 
     protected int|false|null $twoFactorSetupTtl = null;
 
-    protected ?bool $rememberTwoFactorOnDevice = null;
+    protected int|false|null $twoFactorChallengeResendMaxAttempts = null;
 
-    protected ?int $rememberTwoFactorForDays = null;
+    protected int|false|null $twoFactorChallengeResendDecaySeconds = null;
+
+    protected ?bool $twoFactorRememberOnDevice = null;
+
+    protected ?int $twoFactorRememberForDays = null;
 
     protected ?Closure $twoFactorRequirementPolicy = null;
 
     protected ?int $twoFactorGracePeriodDays = null;
+
+    protected ?bool $twoFactorRequireSetupOnLogin = null;
+
+    protected ?TwoFactorMethod $twoFactorMethod = null;
+
+    protected ?Closure $twoFactorSendEmailCodeUsing = null;
+
+    protected ?Closure $twoFactorSendSmsCodeUsing = null;
+
+    protected ?Closure $twoFactorResolveSmsRecipientUsing = null;
 
     public function getTwoFactorChallengeFeature(): TwoFactorChallengeFeature
     {
@@ -52,6 +68,8 @@ trait HasTwoFactor
         int|false|null $challengeMaxAttempts = null,
         Layout|string|null $challengeLayout = null,
         int|false|null $challengeTtl = null,
+        int|false|null $challengeResendMaxAttempts = null,
+        int|false|null $challengeResendDecaySeconds = null,
         ?bool $rememberOnDevice = null,
         ?int $rememberForDays = null,
         ?Closure $requireWhen = null,
@@ -63,6 +81,11 @@ trait HasTwoFactor
         int|false|null $setupMaxAttempts = null,
         Layout|string|null $setupLayout = null,
         int|false|null $setupTtl = null,
+        ?bool $requireSetupOnLogin = null,
+        ?TwoFactorMethod $method = null,
+        ?Closure $sendEmailCodeUsing = null,
+        ?Closure $sendSmsCodeUsing = null,
+        ?Closure $resolveSmsRecipientUsing = null,
     ): static {
         $this->getTwoFactorChallengeFeature()->configure(
             $challengeRouteAction,
@@ -83,11 +106,18 @@ trait HasTwoFactor
         );
 
         $this->twoFactorChallengeTtl = $challengeTtl ?? 600;
-        $this->rememberTwoFactorOnDevice = $rememberOnDevice ?? false;
-        $this->rememberTwoFactorForDays = $rememberForDays ?? 30;
+        $this->twoFactorChallengeResendMaxAttempts = $challengeResendMaxAttempts ?? 3;
+        $this->twoFactorChallengeResendDecaySeconds = $challengeResendDecaySeconds ?? 300;
+        $this->twoFactorRememberOnDevice = $rememberOnDevice ?? false;
+        $this->twoFactorRememberForDays = $rememberForDays ?? 30;
         $this->twoFactorRequirementPolicy = $requireWhen;
         $this->twoFactorGracePeriodDays = $gracePeriodDays;
         $this->twoFactorSetupTtl = $setupTtl ?? 600;
+        $this->twoFactorRequireSetupOnLogin = $requireSetupOnLogin ?? false;
+        $this->twoFactorMethod = $method ?? TwoFactorMethod::Totp;
+        $this->twoFactorSendEmailCodeUsing = $sendEmailCodeUsing;
+        $this->twoFactorSendSmsCodeUsing = $sendSmsCodeUsing;
+        $this->twoFactorResolveSmsRecipientUsing = $resolveSmsRecipientUsing;
 
         return $this;
     }
@@ -125,32 +155,55 @@ trait HasTwoFactor
         return true;
     }
 
+    public function requiresTwoFactorSetup(?Model $user): bool
+    {
+        if (! $this->shouldRequireTwoFactorSetupOnLogin()) {
+            return false;
+        }
+
+        if (! $this->getTwoFactorSetupFeature()->hasFeature()) {
+            return false;
+        }
+
+        if (! $user) {
+            return false;
+        }
+
+        $twoFactorUser = app(TwoFactorUser::class);
+
+        if (! $twoFactorUser->canStoreTwoFactorSecret($user)) {
+            return false;
+        }
+
+        return ! $twoFactorUser->hasTwoFactorEnabled($user, $this);
+    }
+
+    public function shouldRequireTwoFactorSetupOnLogin(): bool
+    {
+        return (bool) $this->twoFactorRequireSetupOnLogin;
+    }
+
     public function startTwoFactorChallenge(Model $user, bool $remember = true): void
     {
-        Session::put($this->getTwoFactorChallengeSessionKey(), [
-            'user_id' => $user->getAuthIdentifier(),
-            'remember' => $remember,
-            'remember_device' => false,
-            'guard' => $this->getGuard(),
-            'started_at' => now()->timestamp,
-        ]);
+        $manager = app(TwoFactorUser::class);
+        $method = $manager->getTwoFactorMethod($user, $this);
+
+        $this->twoFactorSessionManager()->startChallenge($this, $user, $remember, $method);
+
+        $secret = $manager->getTwoFactorSecret($user, $this);
+
+        if (! is_string($secret) || blank($secret)) {
+            return;
+        }
+
+        if ($method !== TwoFactorMethod::Totp) {
+            $this->dispatchTwoFactorCode($user, $method, app(Totp::class)->currentCode($secret), 'challenge');
+        }
     }
 
     public function getTwoFactorChallengeSession(): ?array
     {
-        $challenge = Session::get($this->getTwoFactorChallengeSessionKey());
-
-        if (! is_array($challenge)) {
-            return null;
-        }
-
-        if ($this->isTwoFactorSessionExpired($challenge, $this->getTwoFactorChallengeTtl())) {
-            $this->clearTwoFactorChallenge();
-
-            return null;
-        }
-
-        return $challenge;
+        return $this->twoFactorSessionManager()->getChallenge($this);
     }
 
     public function hasPendingTwoFactorChallenge(): bool
@@ -160,7 +213,7 @@ trait HasTwoFactor
 
     public function clearTwoFactorChallenge(): void
     {
-        Session::forget($this->getTwoFactorChallengeSessionKey());
+        $this->twoFactorSessionManager()->clearChallenge($this);
     }
 
     public function getPendingTwoFactorChallengeUser(): ?Authenticatable
@@ -171,13 +224,7 @@ trait HasTwoFactor
             return null;
         }
 
-        $auth = $this->auth();
-
-        if (! method_exists($auth, 'getProvider')) {
-            return null;
-        }
-
-        return $auth->getProvider()->retrieveById($challenge['user_id'] ?? null);
+        return $this->authProvider()->retrieveById($challenge['user_id'] ?? null);
     }
 
     public function getTwoFactorChallengeRemember(): bool
@@ -185,79 +232,158 @@ trait HasTwoFactor
         return (bool) ($this->getTwoFactorChallengeSession()['remember'] ?? false);
     }
 
-    public function setTwoFactorChallengeRememberDevice(bool $rememberDevice): void
+    public function getPendingTwoFactorChallengeMethod(): TwoFactorMethod
     {
-        $challenge = $this->getTwoFactorChallengeSession();
+        $method = TwoFactorMethod::tryFrom((string) ($this->getTwoFactorChallengeSession()['method'] ?? ''));
 
-        if (! $challenge) {
-            return;
+        return $method instanceof TwoFactorMethod && $method === $this->getTwoFactorMethod()
+            ? $method
+            : TwoFactorMethod::Totp;
+    }
+
+    public function resendPendingTwoFactorChallengeCode(): bool
+    {
+        $user = $this->getPendingTwoFactorChallengeUser();
+
+        if (! $user instanceof Model) {
+            return false;
         }
 
-        $challenge['remember_device'] = $rememberDevice;
+        $method = $this->getPendingTwoFactorChallengeMethod();
 
-        Session::put($this->getTwoFactorChallengeSessionKey(), $challenge);
-    }
+        if ($method === TwoFactorMethod::Totp) {
+            return false;
+        }
 
-    public function shouldRememberTwoFactorOnDevice(): bool
-    {
-        return $this->rememberTwoFactorOnDevice;
-    }
+        $throttleKey = $this->getTwoFactorChallengeResendThrottleKey($user);
+        $challengeResendMaxAttempts = $this->getTwoFactorChallengeResendMaxAttempts();
 
-    public function twoFactorRequireUsing(?Closure $policy): static
-    {
-        $this->twoFactorRequirementPolicy = $policy;
-
-        return $this;
-    }
-
-    public function twoFactorGracePeriod(?int $days): static
-    {
-        $this->twoFactorGracePeriodDays = $days;
-
-        return $this;
-    }
-
-    public function getRememberTwoFactorForDays(): int
-    {
-        return max(1, $this->rememberTwoFactorForDays);
-    }
-
-    public function rememberTwoFactorOnCurrentDevice(Model $user): void
-    {
-        if (! $this->shouldRememberTwoFactorOnDevice()) {
-            return;
+        if ($challengeResendMaxAttempts && RateLimiter::tooManyAttempts($throttleKey, $challengeResendMaxAttempts)) {
+            throw TwoFactorChallengeException::rateLimited(RateLimiter::availableIn($throttleKey));
         }
 
         $secret = app(TwoFactorUser::class)->getTwoFactorSecret($user, $this);
 
         if (! is_string($secret) || blank($secret)) {
-            return;
+            return false;
         }
 
-        $issued = app(TrustedDevices::class)->issue($this, $user, $this->getRememberTwoFactorForDays());
+        $this->dispatchTwoFactorCode($user, $method, app(Totp::class)->currentCode($secret), 'challenge');
 
-        if (! is_array($issued)) {
-            return;
+        $challengeResendDecaySeconds = $this->getTwoFactorChallengeResendDecaySeconds();
+        if ($challengeResendDecaySeconds) {
+            RateLimiter::hit($throttleKey, $challengeResendDecaySeconds);
         }
 
-        Cookie::queue(Cookie::make(
-            $this->getTwoFactorRememberDeviceCookieName(),
-            "{$issued['id']}|{$issued['token']}",
-            $this->getRememberTwoFactorForDays() * 1440,
-            null,
-            null,
-            request()->isSecure(),
-            true,
-            false,
-            'lax',
-        ));
+        return true;
+    }
 
-        event(new TwoFactorTrustedDeviceRemembered($this, $user, (int) $issued['id']));
+    public function startPendingTwoFactorSetup(Model $user, bool $remember = true, ?TwoFactorMethod $method = null): void
+    {
+        $method ??= $this->getTwoFactorMethod();
+
+        $this->twoFactorSessionManager()->startPendingSetup($this, $user, $remember, $method);
+    }
+
+    public function getPendingTwoFactorSetupSession(): ?array
+    {
+        return $this->twoFactorSessionManager()->getPendingSetup($this);
+    }
+
+    public function hasPendingTwoFactorSetup(): bool
+    {
+        return filled($this->getPendingTwoFactorSetupSession()['user_id'] ?? null);
+    }
+
+    public function getPendingTwoFactorSetupUser(): ?Authenticatable
+    {
+        $setup = $this->getPendingTwoFactorSetupSession();
+
+        if (! $setup) {
+            return null;
+        }
+
+        return $this->authProvider()->retrieveById($setup['user_id'] ?? null);
+    }
+
+    public function getPendingTwoFactorSetupRemember(): bool
+    {
+        return (bool) ($this->getPendingTwoFactorSetupSession()['remember'] ?? false);
+    }
+
+    public function getPendingTwoFactorSetupMethod(): TwoFactorMethod
+    {
+        $method = TwoFactorMethod::tryFrom((string) ($this->getPendingTwoFactorSetupSession()['method'] ?? ''));
+
+        return $method instanceof TwoFactorMethod && $method === $this->getTwoFactorMethod()
+            ? $method
+            : $this->getTwoFactorMethod();
+    }
+
+    public function completePendingTwoFactorSetupLogin(): bool
+    {
+        $user = $this->getPendingTwoFactorSetupUser();
+
+        if (! $user) {
+            $this->clearPendingTwoFactorSetup();
+
+            return false;
+        }
+
+        $this->auth()->login($user, $this->getPendingTwoFactorSetupRemember());
+        $this->clearPendingTwoFactorSetup();
+
+        Session::regenerate();
+
+        return true;
+    }
+
+    public function clearPendingTwoFactorSetup(): void
+    {
+        $this->twoFactorSessionManager()->clearPendingSetup($this);
+    }
+
+    public function getPendingTwoFactorSetupSessionKey(): string
+    {
+        return "guardian.{$this->getId()}.two-factor.pending-setup";
+    }
+
+    public function setTwoFactorChallengeRememberDevice(bool $rememberDevice): void
+    {
+        $this->twoFactorSessionManager()->updateChallenge(
+            $this,
+            function (array $challenge) use ($rememberDevice): array {
+                $challenge['remember_device'] = $rememberDevice;
+
+                return $challenge;
+            }
+        );
+    }
+
+    public function shouldTwoFactorRememberOnDevice(): bool
+    {
+        return (bool) $this->twoFactorRememberOnDevice;
+    }
+
+    public function getTwoFactorRememberForDays(): int
+    {
+        return max(1, $this->twoFactorRememberForDays);
+    }
+
+    public function rememberTwoFactorOnCurrentDevice(Model $user): void
+    {
+        $this->twoFactorTrustedDeviceManager()->remember(
+            fortress: $this,
+            user: $user,
+            enabled: $this->shouldTwoFactorRememberOnDevice(),
+            days: $this->getTwoFactorRememberForDays(),
+            cookieName: $this->getTwoFactorRememberDeviceCookieName(),
+        );
     }
 
     public function forgetRememberedTwoFactorDevice(): void
     {
-        Cookie::queue(Cookie::forget($this->getTwoFactorRememberDeviceCookieName()));
+        $this->twoFactorTrustedDeviceManager()->forget($this->getTwoFactorRememberDeviceCookieName());
     }
 
     /**
@@ -265,29 +391,17 @@ trait HasTwoFactor
      */
     public function listTrustedTwoFactorDevices(Model $user): array
     {
-        return app(TrustedDevices::class)->list($this, $user);
+        return $this->twoFactorTrustedDeviceManager()->list($this, $user);
     }
 
     public function revokeTrustedTwoFactorDevice(Model $user, int $deviceId): bool
     {
-        $revoked = app(TrustedDevices::class)->revoke($deviceId, $this, $user);
-
-        if ($revoked) {
-            event(new TwoFactorTrustedDeviceRevoked($this, $user, $deviceId));
-        }
-
-        return $revoked;
+        return $this->twoFactorTrustedDeviceManager()->revoke($this, $user, $deviceId);
     }
 
     public function revokeAllTrustedTwoFactorDevices(Model $user): int
     {
-        $count = app(TrustedDevices::class)->revokeAll($this, $user);
-
-        if ($count > 0) {
-            event(new TwoFactorTrustedDevicesRevokedAll($this, $user, $count));
-        }
-
-        return $count;
+        return $this->twoFactorTrustedDeviceManager()->revokeAll($this, $user);
     }
 
     public function getTwoFactorChallengeSessionKey(): string
@@ -295,29 +409,16 @@ trait HasTwoFactor
         return "guardian.{$this->getId()}.two-factor.challenge";
     }
 
-    public function startTwoFactorSetup(string $secret): void
+    public function startTwoFactorSetup(string $secret, ?TwoFactorMethod $method = null): void
     {
-        Session::put($this->getTwoFactorSetupSessionKey(), [
-            'secret' => $secret,
-            'started_at' => now()->timestamp,
-        ]);
+        $method ??= $this->getTwoFactorMethod();
+
+        $this->twoFactorSessionManager()->startSetup($this, $secret, $method);
     }
 
     public function getTwoFactorSetupSession(): ?array
     {
-        $setup = Session::get($this->getTwoFactorSetupSessionKey());
-
-        if (! is_array($setup)) {
-            return null;
-        }
-
-        if ($this->isTwoFactorSessionExpired($setup, $this->getTwoFactorSetupTtl())) {
-            $this->clearTwoFactorSetup();
-
-            return null;
-        }
-
-        return $setup;
+        return $this->twoFactorSessionManager()->getSetup($this);
     }
 
     public function getTwoFactorSetupSecret(): ?string
@@ -325,9 +426,18 @@ trait HasTwoFactor
         return $this->getTwoFactorSetupSession()['secret'] ?? null;
     }
 
+    public function getTwoFactorSetupMethod(): TwoFactorMethod
+    {
+        $method = TwoFactorMethod::tryFrom((string) ($this->getTwoFactorSetupSession()['method'] ?? ''));
+
+        return $method instanceof TwoFactorMethod && $method === $this->getTwoFactorMethod()
+            ? $method
+            : $this->getTwoFactorMethod();
+    }
+
     public function clearTwoFactorSetup(): void
     {
-        Session::forget($this->getTwoFactorSetupSessionKey());
+        $this->twoFactorSessionManager()->clearSetup($this);
     }
 
     public function getTwoFactorSetupSessionKey(): string
@@ -345,58 +455,33 @@ trait HasTwoFactor
         return $this->twoFactorSetupTtl;
     }
 
-    protected function isTwoFactorSessionExpired(array $session, int|false|null $ttl): bool
+    public function getTwoFactorMethod(): TwoFactorMethod
     {
-        if (! is_int($ttl) || $ttl <= 0) {
-            return false;
-        }
+        return $this->twoFactorMethod;
+    }
 
-        $startedAt = $session['started_at'] ?? null;
-
-        if (! is_int($startedAt)) {
-            return true;
-        }
-
-        return ($startedAt + $ttl) < now()->timestamp;
+    public function dispatchTwoFactorCode(Model $user, TwoFactorMethod $method, string $code, string $context): void
+    {
+        $this->twoFactorDeliveryManager()->dispatch(
+            fortress: $this,
+            user: $user,
+            method: $method,
+            code: $code,
+            context: $context,
+            sendEmailCodeUsing: $this->twoFactorSendEmailCodeUsing,
+            sendSmsCodeUsing: $this->twoFactorSendSmsCodeUsing,
+            resolveSmsRecipientUsing: $this->twoFactorResolveSmsRecipientUsing,
+        );
     }
 
     protected function shouldSkipTwoFactorForRememberedDevice(Model $user): bool
     {
-        if (! $this->shouldRememberTwoFactorOnDevice()) {
-            return false;
-        }
-
-        $cookie = request()->cookie($this->getTwoFactorRememberDeviceCookieName());
-
-        if (! is_string($cookie) || blank($cookie)) {
-            return false;
-        }
-
-        $parts = explode('|', $cookie, 2);
-
-        if (count($parts) !== 2) {
-            $this->forgetRememberedTwoFactorDevice();
-
-            return false;
-        }
-
-        [$deviceId, $token] = $parts;
-
-        if (! ctype_digit($deviceId) || blank($token)) {
-            $this->forgetRememberedTwoFactorDevice();
-
-            return false;
-        }
-
-        $trusted = app(TrustedDevices::class)->touchIfValid($this, $user, (int) $deviceId, $token);
-
-        if (! $trusted) {
-            $this->forgetRememberedTwoFactorDevice();
-
-            return false;
-        }
-
-        return true;
+        return $this->twoFactorTrustedDeviceManager()->shouldSkipChallenge(
+            fortress: $this,
+            user: $user,
+            enabled: $this->shouldTwoFactorRememberOnDevice(),
+            cookieName: $this->getTwoFactorRememberDeviceCookieName(),
+        );
     }
 
     protected function isWithinTwoFactorGracePeriod(Model $user, TwoFactorUser $twoFactorUser): bool
@@ -417,6 +502,43 @@ trait HasTwoFactor
     protected function getTwoFactorRememberDeviceCookieName(): string
     {
         return "guardian_{$this->getId()}_remember_2fa";
+    }
+
+    protected function getTwoFactorChallengeResendMaxAttempts(): int|false|null
+    {
+        return $this->twoFactorChallengeResendMaxAttempts;
+    }
+
+    protected function getTwoFactorChallengeResendDecaySeconds(): int|false|null
+    {
+        return $this->twoFactorChallengeResendDecaySeconds;
+    }
+
+    protected function getTwoFactorChallengeResendThrottleKey(Model $user): string
+    {
+        return sha1(implode('|', array_filter([
+            static::class,
+            '2fa-challenge-resend',
+            $this->getId(),
+            $this->getGuard(),
+            (string) $user->getAuthIdentifier(),
+            (string) request()->ip(),
+        ])));
+    }
+
+    protected function twoFactorSessionManager(): TwoFactorSessionManager
+    {
+        return app(TwoFactorSessionManager::class);
+    }
+
+    protected function twoFactorDeliveryManager(): TwoFactorDeliveryManager
+    {
+        return app(TwoFactorDeliveryManager::class);
+    }
+
+    protected function twoFactorTrustedDeviceManager(): TwoFactorTrustedDeviceManager
+    {
+        return app(TwoFactorTrustedDeviceManager::class);
     }
 
     public function twoFactorRoutes(): static

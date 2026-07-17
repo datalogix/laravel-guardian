@@ -2,7 +2,7 @@
 
 namespace Datalogix\Guardian\Commands;
 
-use Datalogix\Guardian\Support\TrustedDevices;
+use Datalogix\Guardian\Support\TwoFactor\TrustedDevices;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 

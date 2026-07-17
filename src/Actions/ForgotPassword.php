@@ -7,6 +7,7 @@ use Datalogix\Guardian\Guardian;
 use Illuminate\Auth\Events\PasswordResetLinkSent;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Contracts\Auth\CanResetPassword;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Password;
 
 class ForgotPassword implements HasValidationRules
@@ -18,12 +19,11 @@ class ForgotPassword implements HasValidationRules
         return $this->throttleAction(fn () => Password::broker(Guardian::getPasswordBroker())->sendResetLink(
             $data,
             function (CanResetPassword $user, string $token) {
-                if (Guardian::cannotAccess($user)) {
+                if (! $user instanceof Model || Guardian::cannotAccess($user)) {
                     return;
                 }
 
-                ResetPassword::createUrlUsing(fn () => Guardian::getResetPasswordUrl($token, $user));
-
+                ResetPassword::createUrlUsing(fn (mixed $notifiable, string $notificationToken) => Guardian::getResetPasswordUrl($notificationToken, $notifiable));
                 $user->sendPasswordResetNotification($token);
 
                 event(new PasswordResetLinkSent($user));

@@ -19,6 +19,6 @@ use Datalogix\Guardian\Enums\IdentifierKey;
         IdentifierKey::Username => 'username',
         IdentifierKey::Both => 'username',
     } }}"
-    :forgot-password="guardian()->getForgotPasswordFeature()->getUrl()"
-    :sign-up="guardian()->getSignUpFeature()->getUrl()"
+    :forgot-password="guardian()->forgotPasswordUrl()"
+    :sign-up="guardian()->signUpUrl()"
 />

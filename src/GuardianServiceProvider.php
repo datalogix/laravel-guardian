@@ -36,13 +36,14 @@ class GuardianServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'guardian');
 
         app()->booted(function () {
             app(FortressRegistry::class)->validate();
 
             $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+
+            $this->loadMigrationsConditionally();
         });
 
         if (class_exists(Livewire::class)) {
@@ -62,5 +63,41 @@ class GuardianServiceProvider extends ServiceProvider
         }
 
         Guardian::serving(fn () => Guardian::setServingStatus());
+    }
+
+    protected function loadMigrationsConditionally(): void
+    {
+        $fortresses = app(FortressRegistry::class)->all();
+
+        $hasTwoFactor = collect($fortresses)->some(
+            fn ($fortress) => $fortress->getTwoFactorChallengeFeature()->hasFeature()
+                || $fortress->getTwoFactorSetupFeature()->hasFeature()
+        );
+
+        $hasTrustedDevices = $hasTwoFactor && collect($fortresses)->some(
+            fn ($fortress) => $fortress->shouldTwoFactorRememberOnDevice()
+        );
+
+        $hasOAuth = collect($fortresses)->some(
+            fn ($fortress) => $fortress->getOAuthFeature()->hasFeature()
+        );
+
+        $migrations = [];
+
+        if ($hasTwoFactor) {
+            $migrations[] = __DIR__.'/../database/migrations/2026_01_01_000000_add_two_factor_columns_to_users_table.php';
+        }
+
+        if ($hasTrustedDevices) {
+            $migrations[] = __DIR__.'/../database/migrations/2026_01_01_000000_create_two_factor_trusted_devices_table.php';
+        }
+
+        if ($hasOAuth) {
+            $migrations[] = __DIR__.'/../database/migrations/2026_01_01_000000_create_oauth_identities_table.php';
+        }
+
+        if ($migrations !== []) {
+            $this->loadMigrationsFrom($migrations);
+        }
     }
 }

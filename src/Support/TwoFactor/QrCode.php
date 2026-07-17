@@ -1,6 +1,6 @@
 <?php
 
-namespace Datalogix\Guardian\Support;
+namespace Datalogix\Guardian\Support\TwoFactor;
 
 use BaconQrCode\Renderer\Image\SvgImageBackEnd;
 use BaconQrCode\Renderer\ImageRenderer;

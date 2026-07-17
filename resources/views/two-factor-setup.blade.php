@@ -6,8 +6,8 @@
 
         <p>To disable two-factor, confirm your password first.</p>
 
-        @if (guardian()->getPasswordConfirmationFeature()->getUrl())
-            <a href="{{ guardian()->getPasswordConfirmationFeature()->getUrl() }}">Confirm password</a>
+        @if (guardian()->passwordConfirmationUrl())
+            <a href="{{ guardian()->passwordConfirmationUrl() }}">Confirm password</a>
         @endif
 
         @error('password')
@@ -50,39 +50,44 @@
         @endif
     @else
         <p>Two-factor authentication is disabled.</p>
+        <button wire:click="prepare" type="button">Generate setup secret</button>
 
-        @if (! $secret)
-            <button wire:click="prepare" type="button">Generate setup secret</button>
-        @else
-            @if ($qrSvg)
+        @if ($secret)
+            @if ($method === \Datalogix\Guardian\Enums\TwoFactorMethod::Totp && $qrSvg)
                 <div>{!! $qrSvg !!}</div>
             @endif
 
-            <p>Use this secret in your authenticator app:</p>
+            @if ($method === \Datalogix\Guardian\Enums\TwoFactorMethod::Totp)
+                <p>Use this secret in your authenticator app:</p>
 
-            <pre>{{ $secret }}</pre>
+                <pre>{{ $secret }}</pre>
 
-            <button
-                type="button"
-                @if ($secret)
-                    onclick="navigator.clipboard?.writeText(@js($secret))"
-                @endif
-            >
-                Copy secret
-            </button>
+                <button
+                    type="button"
+                    @if ($secret)
+                        onclick="navigator.clipboard?.writeText(@js($secret))"
+                    @endif
+                >
+                    Copy secret
+                </button>
 
-            <p>OTPAuth URI (for QR generation):</p>
+                <p>OTPAuth URI (for QR generation):</p>
 
-            <pre>{{ $uri }}</pre>
+                <pre>{{ $uri }}</pre>
 
-            <button
-                type="button"
-                @if ($uri)
-                    onclick="navigator.clipboard?.writeText(@js($uri))"
-                @endif
-            >
-                Copy URI
-            </button>
+                <button
+                    type="button"
+                    @if ($uri)
+                        onclick="navigator.clipboard?.writeText(@js($uri))"
+                    @endif
+                >
+                    Copy URI
+                </button>
+            @elseif ($method === \Datalogix\Guardian\Enums\TwoFactorMethod::Email)
+                <p>We sent a 6-digit verification code to your email. Enter it below to enable two-factor authentication.</p>
+            @elseif ($method === \Datalogix\Guardian\Enums\TwoFactorMethod::Sms)
+                <p>We sent a 6-digit verification code by SMS. Enter it below to enable two-factor authentication.</p>
+            @endif
 
             <form wire:submit="enable">
                 <div>

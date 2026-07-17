@@ -47,7 +47,7 @@ trait HasPasswordConfirmation
 
     public function getPasswordConfirmationMiddleware(): ?string
     {
-        return $this->hasFeature()
+        return $this->getPasswordConfirmationFeature()->hasFeature()
             ? "{$this->getPasswordConfirmationMiddlewareName()}:{$this->generateRouteName($this->getPasswordConfirmationFeature()->getRouteName())}"
             : null;
     }
@@ -64,5 +64,10 @@ trait HasPasswordConfirmation
         }
 
         return $this;
+    }
+
+    public function passwordConfirmationUrl(): ?string
+    {
+        return $this->getPasswordConfirmationFeature()->getUrl();
     }
 }

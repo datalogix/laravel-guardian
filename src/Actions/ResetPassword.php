@@ -3,8 +3,8 @@
 namespace Datalogix\Guardian\Actions;
 
 use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
-use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Exceptions\ResetPasswordException;
+use Datalogix\Guardian\Guardian;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;

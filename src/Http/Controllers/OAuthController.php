@@ -4,6 +4,7 @@ namespace Datalogix\Guardian\Http\Controllers;
 
 use Datalogix\Guardian\Actions\OAuthCallback as OAuthCallbackAction;
 use Datalogix\Guardian\Actions\OAuthRedirect as OAuthRedirectAction;
+use Datalogix\Guardian\Enums\AuthFlowResult;
 use Datalogix\Guardian\Exceptions\OAuthException;
 use Datalogix\Guardian\Guardian;
 
@@ -19,7 +20,7 @@ class OAuthController
         try {
             $requiresTwoFactorChallenge = app(OAuthCallbackAction::class)($provider);
 
-            if ($requiresTwoFactorChallenge) {
+            if ($requiresTwoFactorChallenge === AuthFlowResult::ChallengeRequired) {
                 return app(Guardian::getTwoFactorChallengeFeature()->getResponse());
             }
 

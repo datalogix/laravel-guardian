@@ -28,7 +28,7 @@ trait HasRateLimiter
         return is_int($maxAttempts) && $maxAttempts > 0;
     }
 
-    protected function throttleKey(?string $key = null)
+    protected function throttleKey(?string $key = null): string
     {
         return sha1(implode('|', array_filter([
             static::class,

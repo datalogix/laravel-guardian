@@ -8,15 +8,19 @@ use Datalogix\Guardian\Events\TwoFactorChallengeSucceeded;
 use Datalogix\Guardian\Events\TwoFactorRecoveryCodeUsed;
 use Datalogix\Guardian\Exceptions\TwoFactorChallengeException;
 use Datalogix\Guardian\Guardian;
-use Datalogix\Guardian\Support\Totp;
-use Datalogix\Guardian\Support\TwoFactorUser;
+use Datalogix\Guardian\Support\TwoFactor\TwoFactorChallengeVerifier;
 use Illuminate\Auth\Events\Lockout;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 
 class ConfirmTwoFactorChallenge implements HasValidationRules
 {
     use Concerns\HasRateLimiter;
+
+    public function __construct(
+        protected TwoFactorChallengeVerifier $challengeVerifier,
+    ) {}
 
     public function __invoke(array $data = []): void
     {
@@ -33,7 +37,7 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
 
         $user = Guardian::getPendingTwoFactorChallengeUser();
 
-        if (! $user instanceof \Illuminate\Database\Eloquent\Model) {
+        if (! $user instanceof Model) {
             Guardian::clearTwoFactorChallenge();
             event(new TwoFactorChallengeFailed(Guardian::getCurrentOrDefaultFortress(), null, 'not-pending'));
 
@@ -41,23 +45,25 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
         }
 
         $fortress = Guardian::getCurrentOrDefaultFortress();
-        $manager = app(TwoFactorUser::class);
-        $secret = $manager->getTwoFactorSecret($user, $fortress);
         $code = (string) ($data['code'] ?? '');
-        $isTotpValid = is_string($secret) && app(Totp::class)->verify($secret, $code);
+        $verification = $this->challengeVerifier->verify($user, $fortress, $code);
+        $usedRecoveryCode = $verification->usedRecoveryCode();
 
-        $usedRecoveryCode = ! $isTotpValid && $this->consumeRecoveryCode($user, $code);
-
-        if (! $isTotpValid && ! $usedRecoveryCode) {
+        if (! $verification->isValid()) {
             RateLimiter::hit($throttleKey);
             event(new TwoFactorChallengeFailed($fortress, $user, 'invalid-code'));
 
             throw TwoFactorChallengeException::invalid();
         }
 
+        if ($usedRecoveryCode) {
+            event(new TwoFactorRecoveryCodeUsed($fortress, $user));
+        }
+
         RateLimiter::clear($throttleKey);
 
         Guardian::auth()->login($user, Guardian::getTwoFactorChallengeRemember());
+        Guardian::clearPendingTwoFactorSetup();
 
         if ((bool) ($data['remember_device'] ?? false)) {
             Guardian::rememberTwoFactorOnCurrentDevice($user);
@@ -98,23 +104,10 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
 
         event(new TwoFactorChallengeFailed(
             Guardian::getCurrentOrDefaultFortress(),
-            $user instanceof \Illuminate\Database\Eloquent\Model ? $user : null,
+            $user instanceof Model ? $user : null,
             'rate-limited',
         ));
 
         throw TwoFactorChallengeException::rateLimited($seconds);
-    }
-
-    protected function consumeRecoveryCode(object $user, string $code): bool
-    {
-        $manager = app(TwoFactorUser::class);
-        $fortress = Guardian::getCurrentOrDefaultFortress();
-        $consumed = $manager->consumeTwoFactorRecoveryCode($user, $fortress, $code);
-
-        if ($consumed && $user instanceof \Illuminate\Database\Eloquent\Model) {
-            event(new TwoFactorRecoveryCodeUsed($fortress, $user));
-        }
-
-        return $consumed;
     }
 }

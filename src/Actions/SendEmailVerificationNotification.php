@@ -3,7 +3,6 @@
 namespace Datalogix\Guardian\Actions;
 
 use Datalogix\Guardian\Guardian;
-use Exception;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Model;
@@ -27,15 +26,8 @@ class SendEmailVerificationNotification
                 return;
             }
 
-            if (! method_exists($user, 'notify')) {
-                $userClass = $user::class;
-
-                throw new Exception("Model [{$userClass}] does not have a [notify()] method.");
-            }
-
-            VerifyEmail::createUrlUsing(fn () => Guardian::getVerifyEmailUrl($user));
-
-            $user->notify(app(VerifyEmail::class));
+            VerifyEmail::createUrlUsing(fn (mixed $notifiable) => Guardian::getVerifyEmailUrl($notifiable));
+            $user->sendEmailVerificationNotification();
         }, $user->getKey(), Guardian::getEmailVerificationVerifyFeature()->getMaxAttempts());
     }
 }

@@ -40,4 +40,9 @@ trait HasLogout
 
         return $this;
     }
+
+    public function logoutUrl(): ?string
+    {
+        return $this->getLogoutFeature()->getUrl();
+    }
 }

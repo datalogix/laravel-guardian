@@ -2,20 +2,19 @@
 
 namespace Datalogix\Guardian\Actions;
 
+use Datalogix\Guardian\Enums\AuthFlowResult;
 use Datalogix\Guardian\Enums\IdentifierKey;
 use Datalogix\Guardian\Enums\OAuthEmailCollisionPolicy;
 use Datalogix\Guardian\Exceptions\OAuthException;
 use Datalogix\Guardian\Guardian;
-use Datalogix\Guardian\Support\OAuthIdentities;
-use Datalogix\Guardian\Support\OAuthTokenPayload;
-use Illuminate\Auth\EloquentUserProvider;
+use Datalogix\Guardian\Support\Auth\PostAuthenticationFlow;
+use Datalogix\Guardian\Support\OAuth\OAuthIdentities;
+use Datalogix\Guardian\Support\OAuth\OAuthTokenPayload;
 use Illuminate\Auth\Events\Registered;
-use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Contracts\Provider;
 use Laravel\Socialite\Contracts\User as ProviderUser;
@@ -24,12 +23,16 @@ use Throwable;
 
 class OAuthCallback
 {
-    protected static string $userModel;
-
     /** @var array<string, bool> */
     protected static array $emailVerifiedColumnCache = [];
 
-    public function __invoke(string $provider, bool $remember = true): bool
+    public function __construct(
+        protected PostAuthenticationFlow $postAuthenticationFlow,
+        protected OAuthIdentities $oauthIdentities,
+        protected OAuthTokenPayload $oauthTokenPayload,
+    ) {}
+
+    public function __invoke(string $provider, bool $remember = true): AuthFlowResult
     {
         $provider = Guardian::normalizeOAuthProvider($provider);
 
@@ -56,18 +59,7 @@ class OAuthCallback
 
         $this->storeIdentity($provider, $providerUserId, $oauthUser, $user);
 
-        if ($user instanceof Model && Guardian::requiresTwoFactorChallenge($user)) {
-            Guardian::startTwoFactorChallenge($user, $remember);
-
-            return true;
-        }
-
-        Guardian::auth()->login($user, $remember);
-        Guardian::clearTwoFactorChallenge();
-
-        Session::regenerate();
-
-        return false;
+        return $this->postAuthenticationFlow->handle($user, $remember);
     }
 
     protected function resolveUser(string $provider, ProviderUser $oauthUser, string $providerUserId): ?Authenticatable
@@ -120,24 +112,18 @@ class OAuthCallback
 
     protected function findLinkedUser(string $provider, string $providerUserId): ?Authenticatable
     {
-        $id = app(OAuthIdentities::class)->findAuthenticatableId(Guardian::getCurrentOrDefaultFortress(), $provider, $providerUserId);
+        $id = $this->oauthIdentities->findAuthenticatableId(Guardian::getCurrentOrDefaultFortress(), $provider, $providerUserId);
 
         if (blank($id)) {
             return null;
         }
 
-        $auth = Guardian::auth();
-
-        if (! method_exists($auth, 'getProvider')) {
-            return null;
-        }
-
-        return $auth->getProvider()->retrieveById($id);
+        return Guardian::authProvider()->retrieveById($id);
     }
 
     protected function findUserByEmail(string $email): ?Authenticatable
     {
-        $modelClass = static::getUserModel();
+        $modelClass = Guardian::authModelClass();
 
         return $modelClass::query()->where('email', $email)->first();
     }
@@ -153,7 +139,7 @@ class OAuthCallback
             return null;
         }
 
-        $modelClass = static::getUserModel();
+        $modelClass = Guardian::authModelClass();
         $name = $oauthUser->getName() ?: $oauthUser->getNickname() ?: Str::headline($provider).' User';
 
         $attributes = [
@@ -188,13 +174,13 @@ class OAuthCallback
         $tokenExpiresAt = null;
 
         if (Guardian::shouldStoreOAuthTokens()) {
-            $tokenPayload = app(OAuthTokenPayload::class)->fromProviderUser($oauthUser);
+            $tokenPayload = $this->oauthTokenPayload->fromProviderUser($oauthUser);
             $accessToken = $tokenPayload['access_token'];
             $refreshToken = $tokenPayload['refresh_token'];
             $tokenExpiresAt = $tokenPayload['token_expires_at'];
         }
 
-        app(OAuthIdentities::class)->link(
+        $this->oauthIdentities->link(
             Guardian::getCurrentOrDefaultFortress(),
             $user,
             $provider,
@@ -237,21 +223,6 @@ class OAuthCallback
         }
 
         return Str::limit('user_'.Str::lower(Str::random(16)), 20, '');
-    }
-
-    protected static function getUserModel(): string
-    {
-        if (isset(static::$userModel)) {
-            return static::$userModel;
-        }
-
-        /** @var SessionGuard $guard */
-        $guard = Guardian::auth();
-
-        /** @var EloquentUserProvider $provider */
-        $provider = $guard->getProvider();
-
-        return static::$userModel = $provider->getModel();
     }
 
     protected function resolveEmailCollision(Authenticatable $user): ?Authenticatable

@@ -3,21 +3,26 @@
 namespace Datalogix\Guardian\Actions;
 
 use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
+use Datalogix\Guardian\Enums\AuthFlowResult;
 use Datalogix\Guardian\Enums\IdentifierKey;
 use Datalogix\Guardian\Exceptions\LoginException;
 use Datalogix\Guardian\Guardian;
+use Datalogix\Guardian\Support\Auth\PostAuthenticationFlow;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Session;
 use Illuminate\Validation\Rules\Password;
 
 class Login implements HasValidationRules
 {
     use Concerns\HasRateLimiter;
 
-    public function __invoke(array $data = [], bool $remember = true): bool
+    public function __construct(
+        protected PostAuthenticationFlow $postAuthenticationFlow,
+    ) {}
+
+    public function __invoke(array $data = [], bool $remember = true): AuthFlowResult
     {
         $throttleKey = $this->throttleKey();
         $this->ensureIsNotRateLimited($throttleKey);
@@ -38,21 +43,9 @@ class Login implements HasValidationRules
             throw LoginException::cannotAccess($auth);
         }
 
-        if ($user instanceof Model && Guardian::requiresTwoFactorChallenge($user)) {
-            RateLimiter::clear($throttleKey);
-
-            Guardian::startTwoFactorChallenge($user, $remember);
-
-            return true;
-        }
-
-        $auth->login($user, $remember);
-        Guardian::clearTwoFactorChallenge();
-
         RateLimiter::clear($throttleKey);
-        Session::regenerate();
 
-        return false;
+        return $this->postAuthenticationFlow->handle($user, $remember);
     }
 
     protected function parseCredentials(array $data = []): array
@@ -102,23 +95,11 @@ class Login implements HasValidationRules
 
     protected function retrieveUser(array $credentials): ?Authenticatable
     {
-        $auth = Guardian::auth();
-
-        if (! method_exists($auth, 'getProvider')) {
-            return null;
-        }
-
-        return $auth->getProvider()->retrieveByCredentials($credentials);
+        return Guardian::authProvider()->retrieveByCredentials($credentials);
     }
 
     protected function credentialsAreValid(Authenticatable $user, array $credentials): bool
     {
-        $auth = Guardian::auth();
-
-        if (! method_exists($auth, 'getProvider')) {
-            return false;
-        }
-
-        return $auth->getProvider()->validateCredentials($user, $credentials);
+        return Guardian::authProvider()->validateCredentials($user, $credentials);
     }
 }

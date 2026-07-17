@@ -1,6 +1,6 @@
 <?php
 
-namespace Datalogix\Guardian\Support;
+namespace Datalogix\Guardian\Support\TwoFactor;
 
 class RecoveryCodes
 {

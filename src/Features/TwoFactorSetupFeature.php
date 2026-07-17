@@ -2,6 +2,7 @@
 
 namespace Datalogix\Guardian\Features;
 
+use Datalogix\Guardian\Http\Middleware\EnsureTwoFactorSetupAccess;
 use Datalogix\Guardian\Http\Responses\TwoFactorSetupResponse;
 use Illuminate\Support\Facades\Route;
 
@@ -40,7 +41,7 @@ class TwoFactorSetupFeature extends Feature
     public function registerRoutes(): void
     {
         Route::get($this->getRouteSlug(), $this->getRouteAction())
-            ->middleware($this->fortress->getAuthMiddleware())
+            ->middleware(EnsureTwoFactorSetupAccess::class)
             ->name($this->getRouteName());
     }
 }

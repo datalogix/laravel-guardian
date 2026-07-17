@@ -1,11 +1,12 @@
 <?php
 
-namespace Datalogix\Guardian\Support;
+namespace Datalogix\Guardian\Support\TwoFactor;
 
 use Datalogix\Guardian\Contracts\CanManageTwoFactorAuthentication;
 use Datalogix\Guardian\Contracts\CanManageTwoFactorRecoveryCodes;
 use Datalogix\Guardian\Contracts\TwoFactorAuthenticatable;
 use Datalogix\Guardian\Contracts\TwoFactorRecoveryCodeAuthenticatable;
+use Datalogix\Guardian\Enums\TwoFactorMethod;
 use Datalogix\Guardian\Fortress;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -16,6 +17,8 @@ class TwoFactorUser
     protected static array $columnCache = [];
 
     protected string $recoveryCodeHashPrefix = 'sha256:';
+
+    protected string $secretMethodSeparator = ':';
 
     public function hasTwoFactorEnabled(mixed $user, Fortress $fortress): bool
     {
@@ -53,6 +56,28 @@ class TwoFactorUser
 
     public function getTwoFactorSecret(mixed $user, Fortress $fortress): ?string
     {
+        $stored = $this->getStoredTwoFactorSecret($user, $fortress);
+
+        if (! is_string($stored) || blank($stored)) {
+            return null;
+        }
+
+        return $this->parseStoredSecret($stored)['secret'] ?? null;
+    }
+
+    public function getTwoFactorMethod(mixed $user, Fortress $fortress): TwoFactorMethod
+    {
+        $stored = $this->getStoredTwoFactorSecret($user, $fortress);
+
+        if (! is_string($stored) || blank($stored)) {
+            return TwoFactorMethod::Totp;
+        }
+
+        return $this->parseStoredSecret($stored)['method'] ?? TwoFactorMethod::Totp;
+    }
+
+    protected function getStoredTwoFactorSecret(mixed $user, Fortress $fortress): ?string
+    {
         if ($user instanceof TwoFactorAuthenticatable) {
             return $user->getTwoFactorSecret($fortress);
         }
@@ -64,6 +89,37 @@ class TwoFactorUser
         $value = $user->getAttribute($this->getSecretColumn());
 
         return is_string($value) && filled($value) ? $value : null;
+    }
+
+    /**
+     * @return array{method: TwoFactorMethod, secret: string}
+     */
+    protected function parseStoredSecret(string $stored): array
+    {
+        $parts = explode($this->secretMethodSeparator, $stored, 2);
+
+        if (count($parts) !== 2) {
+            return [
+                'method' => TwoFactorMethod::Totp,
+                'secret' => $stored,
+            ];
+        }
+
+        [$method, $secret] = $parts;
+
+        $resolvedMethod = TwoFactorMethod::tryFrom($method);
+
+        if (! $resolvedMethod instanceof TwoFactorMethod || blank($secret)) {
+            return [
+                'method' => TwoFactorMethod::Totp,
+                'secret' => $stored,
+            ];
+        }
+
+        return [
+            'method' => $resolvedMethod,
+            'secret' => $secret,
+        ];
     }
 
     public function canStoreTwoFactorSecret(mixed $user): bool

@@ -96,4 +96,9 @@ trait HasPasswordReset
 
         return $this;
     }
+
+    public function forgotPasswordUrl(): ?string
+    {
+        return $this->getForgotPasswordFeature()->getUrl();
+    }
 }

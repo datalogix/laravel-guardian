@@ -6,8 +6,8 @@ use Closure;
 use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Enums\OAuthEmailCollisionPolicy;
 use Datalogix\Guardian\Features\OAuthFeature;
-use InvalidArgumentException;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
 
 trait HasOAuth
 {

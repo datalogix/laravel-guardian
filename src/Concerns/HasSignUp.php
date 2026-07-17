@@ -43,4 +43,9 @@ trait HasSignUp
 
         return $this;
     }
+
+    public function signUpUrl(): ?string
+    {
+        return $this->getSignUpFeature()->getUrl();
+    }
 }
