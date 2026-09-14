@@ -4,7 +4,6 @@ namespace Datalogix\Guardian\Features;
 
 use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
 use Datalogix\Guardian\Http\Responses\ForgotPasswordResponse;
-use Illuminate\Support\Facades\Route;
 
 class ForgotPasswordFeature extends Feature
 {
@@ -40,8 +39,6 @@ class ForgotPasswordFeature extends Feature
 
     public function registerRoutes(): void
     {
-        Route::get($this->getRouteSlug(), $this->getRouteAction())
-            ->middleware(RedirectIfAuthenticated::class)
-            ->name($this->getRouteName());
+        $this->registerRoute('get', $this->getRouteSlug(), RedirectIfAuthenticated::class);
     }
 }

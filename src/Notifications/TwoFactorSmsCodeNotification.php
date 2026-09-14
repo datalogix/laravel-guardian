@@ -2,12 +2,14 @@
 
 namespace Datalogix\Guardian\Notifications;
 
+use Datalogix\Guardian\Notifications\Concerns\HasTwoFactorCodeContext;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 
 class TwoFactorSmsCodeNotification extends Notification implements ShouldQueue
 {
+    use HasTwoFactorCodeContext;
     use Queueable;
 
     public function __construct(
@@ -28,9 +30,10 @@ class TwoFactorSmsCodeNotification extends Notification implements ShouldQueue
             return null;
         }
 
-        $contextLabel = $this->context === 'setup' ? 'setup' : 'login';
+        $content = $this->isSetupContext()
+            ? __('Your two-factor setup code is: :code', ['code' => $this->code])
+            : __('Your two-factor login code is: :code', ['code' => $this->code]);
 
-        return (new $messageClass)
-            ->content("Your two-factor {$contextLabel} code is {$this->code}");
+        return (new $messageClass)->content($content);
     }
 }

@@ -4,7 +4,6 @@ namespace Datalogix\Guardian\Features;
 
 use Datalogix\Guardian\Http\Controllers\LogoutController;
 use Datalogix\Guardian\Http\Responses\LogoutResponse;
-use Illuminate\Support\Facades\Route;
 
 class LogoutFeature extends Feature
 {
@@ -40,8 +39,6 @@ class LogoutFeature extends Feature
 
     public function registerRoutes(): void
     {
-        Route::any($this->getRouteSlug(), $this->getRouteAction())
-            ->middleware($this->fortress->getAuthMiddleware())
-            ->name($this->getRouteName());
+        $this->registerRoute('any', $this->getRouteSlug(), $this->fortress->getAuthMiddleware());
     }
 }

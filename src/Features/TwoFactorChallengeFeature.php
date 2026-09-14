@@ -2,9 +2,9 @@
 
 namespace Datalogix\Guardian\Features;
 
+use Datalogix\Guardian\Http\Middleware\EnsureTwoFactorChallengeAccess;
 use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
 use Datalogix\Guardian\Http\Responses\TwoFactorChallengeResponse;
-use Illuminate\Support\Facades\Route;
 
 class TwoFactorChallengeFeature extends Feature
 {
@@ -40,8 +40,9 @@ class TwoFactorChallengeFeature extends Feature
 
     public function registerRoutes(): void
     {
-        Route::get($this->getRouteSlug(), $this->getRouteAction())
-            ->middleware(RedirectIfAuthenticated::class)
-            ->name($this->getRouteName());
+        $this->registerRoute('get', $this->getRouteSlug(), [
+            RedirectIfAuthenticated::class,
+            EnsureTwoFactorChallengeAccess::class,
+        ]);
     }
 }

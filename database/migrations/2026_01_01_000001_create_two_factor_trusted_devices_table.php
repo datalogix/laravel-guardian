@@ -12,12 +12,25 @@ return new class extends Migration
     public function up(): void
     {
         if (Schema::hasTable('two_factor_trusted_devices')) {
+            $expected = [
+                'fortress_id', 'auth_guard', 'authenticatable_type', 'authenticatable_id',
+                'name', 'ip_address', 'user_agent', 'token_hash', 'last_used_at',
+                'expires_at', 'revoked_at',
+            ];
+
+            if (! Schema::hasColumns('two_factor_trusted_devices', $expected)) {
+                throw new RuntimeException(
+                    'A [two_factor_trusted_devices] table already exists but is missing columns Guardian expects. '.
+                    'Rename or drop the pre-existing table so this migration can create its own.'
+                );
+            }
+
             return;
         }
 
         Schema::create('two_factor_trusted_devices', function (Blueprint $table) {
             $table->id();
-            $table->string('fortress_id', 20)->index();
+            $table->string('fortress_id', 20);
             $table->string('auth_guard', 20)->nullable()->index();
             $table->morphs('authenticatable', 'guardian_two_factor_authenticatable_idx');
             $table->string('name')->nullable();

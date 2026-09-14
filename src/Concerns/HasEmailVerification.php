@@ -101,13 +101,8 @@ trait HasEmailVerification
 
     public function emailVerificationRoutes(): static
     {
-        if ($this->getEmailVerificationPromptFeature()->hasFeature()) {
-            $this->getEmailVerificationPromptFeature()->registerRoutes();
-        }
-
-        if ($this->getEmailVerificationVerifyFeature()->hasFeature()) {
-            $this->getEmailVerificationVerifyFeature()->registerRoutes();
-        }
+        $this->getEmailVerificationPromptFeature()->registerRoutesIfEnabled();
+        $this->getEmailVerificationVerifyFeature()->registerRoutesIfEnabled();
 
         return $this;
     }

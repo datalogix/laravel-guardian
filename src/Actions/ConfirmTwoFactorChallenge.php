@@ -3,16 +3,18 @@
 namespace Datalogix\Guardian\Actions;
 
 use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
+use Datalogix\Guardian\Enums\AuthFlowResult;
 use Datalogix\Guardian\Events\TwoFactorChallengeFailed;
 use Datalogix\Guardian\Events\TwoFactorChallengeSucceeded;
 use Datalogix\Guardian\Events\TwoFactorRecoveryCodeUsed;
 use Datalogix\Guardian\Exceptions\TwoFactorChallengeException;
+use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Guardian;
+use Datalogix\Guardian\Support\Auth\PostAuthenticationFlow;
+use Datalogix\Guardian\Support\TwoFactor\TwoFactorChallengeVerificationResult;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorChallengeVerifier;
-use Illuminate\Auth\Events\Lockout;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Timebox;
 
 class ConfirmTwoFactorChallenge implements HasValidationRules
 {
@@ -20,9 +22,10 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
 
     public function __construct(
         protected TwoFactorChallengeVerifier $challengeVerifier,
+        protected PostAuthenticationFlow $postAuthenticationFlow,
     ) {}
 
-    public function __invoke(array $data = []): void
+    public function __invoke(array $data = []): AuthFlowResult
     {
         $challenge = Guardian::getTwoFactorChallengeSession();
 
@@ -30,10 +33,27 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
             throw TwoFactorChallengeException::notPending();
         }
 
-        $throttleKey = $this->throttleKey((string) ($challenge['user_id'] ?? null));
-        $this->ensureIsNotRateLimited($throttleKey);
+        $throttleKey = $this->throttleKey((string) ($challenge['user_id'] ?? null), includeIp: false);
+        $maxAttempts = Guardian::getTwoFactorChallengeFeature()->getMaxAttempts();
 
-        Guardian::setTwoFactorChallengeRememberDevice((bool) ($data['remember_device'] ?? false));
+        $this->ensureIsNotRateLimited(
+            $throttleKey,
+            $maxAttempts,
+            function (int $seconds) {
+                $user = Guardian::getPendingTwoFactorChallengeUser();
+
+                event(new TwoFactorChallengeFailed(
+                    Guardian::getCurrentOrDefaultFortress(),
+                    $user instanceof Model ? $user : null,
+                    'rate-limited',
+                ));
+
+                throw TwoFactorChallengeException::rateLimited($seconds);
+            }
+        );
+
+        $rememberDevice = (bool) ($data['remember_device'] ?? false);
+        Guardian::setTwoFactorChallengeRememberDevice($rememberDevice);
 
         $user = Guardian::getPendingTwoFactorChallengeUser();
 
@@ -46,11 +66,11 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
 
         $fortress = Guardian::getCurrentOrDefaultFortress();
         $code = (string) ($data['code'] ?? '');
-        $verification = $this->challengeVerifier->verify($user, $fortress, $code);
+        $verification = $this->timeboxedVerify($user, $fortress, $code);
         $usedRecoveryCode = $verification->usedRecoveryCode();
 
         if (! $verification->isValid()) {
-            RateLimiter::hit($throttleKey);
+            $this->hitRateLimiterIfThrottled($throttleKey, $maxAttempts);
             event(new TwoFactorChallengeFailed($fortress, $user, 'invalid-code'));
 
             throw TwoFactorChallengeException::invalid();
@@ -60,20 +80,17 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
             event(new TwoFactorRecoveryCodeUsed($fortress, $user));
         }
 
-        RateLimiter::clear($throttleKey);
+        $this->clearRateLimiterIfThrottled($throttleKey, $maxAttempts);
 
-        Guardian::auth()->login($user, Guardian::getTwoFactorChallengeRemember());
-        Guardian::clearPendingTwoFactorSetup();
-
-        if ((bool) ($data['remember_device'] ?? false)) {
+        if ($rememberDevice) {
             Guardian::rememberTwoFactorOnCurrentDevice($user);
         }
 
-        Guardian::clearTwoFactorChallenge();
+        $this->postAuthenticationFlow->finalize($user, Guardian::getTwoFactorChallengeRemember());
 
         event(new TwoFactorChallengeSucceeded($fortress, $user, $usedRecoveryCode));
 
-        Session::regenerate();
+        return AuthFlowResult::Authenticated;
     }
 
     public static function rules(): array
@@ -84,30 +101,14 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
         ];
     }
 
-    protected function ensureIsNotRateLimited(string $throttleKey): void
+    protected function timeboxedVerify(Model $user, Fortress $fortress, string $code): TwoFactorChallengeVerificationResult
     {
-        $maxAttempts = Guardian::getTwoFactorChallengeFeature()->getMaxAttempts();
+        return app(Timebox::class)->call(function ($timebox) use ($user, $fortress, $code) {
+            $result = $this->challengeVerifier->verify($user, $fortress, $code);
 
-        if (! $this->shouldThrottle($maxAttempts)) {
-            return;
-        }
+            $timebox->returnEarly();
 
-        if (! RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
-            return;
-        }
-
-        event(new Lockout(request()));
-
-        $seconds = RateLimiter::availableIn($throttleKey);
-
-        $user = Guardian::getPendingTwoFactorChallengeUser();
-
-        event(new TwoFactorChallengeFailed(
-            Guardian::getCurrentOrDefaultFortress(),
-            $user instanceof Model ? $user : null,
-            'rate-limited',
-        ));
-
-        throw TwoFactorChallengeException::rateLimited($seconds);
+            return $result;
+        }, config('auth.timebox_duration', 200000));
     }
 }

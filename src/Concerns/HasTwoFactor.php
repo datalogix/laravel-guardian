@@ -3,11 +3,14 @@
 namespace Datalogix\Guardian\Concerns;
 
 use Closure;
+use Datalogix\Guardian\Actions\Concerns\HasRateLimiter;
 use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Enums\TwoFactorMethod;
 use Datalogix\Guardian\Exceptions\TwoFactorChallengeException;
+use Datalogix\Guardian\Exceptions\UnsupportedAuthGuardException;
 use Datalogix\Guardian\Features\TwoFactorChallengeFeature;
 use Datalogix\Guardian\Features\TwoFactorSetupFeature;
+use Datalogix\Guardian\Support\Auth\PostAuthenticationFlow;
 use Datalogix\Guardian\Support\TwoFactor\Totp;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorDeliveryManager;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorSessionManager;
@@ -15,11 +18,11 @@ use Datalogix\Guardian\Support\TwoFactor\TwoFactorTrustedDeviceManager;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorUser;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Session;
 
 trait HasTwoFactor
 {
+    use HasRateLimiter;
+
     protected ?TwoFactorChallengeFeature $twoFactorChallengeFeature = null;
 
     protected ?TwoFactorSetupFeature $twoFactorSetupFeature = null;
@@ -58,6 +61,12 @@ trait HasTwoFactor
     public function getTwoFactorSetupFeature(): TwoFactorSetupFeature
     {
         return $this->twoFactorSetupFeature ??= new TwoFactorSetupFeature($this);
+    }
+
+    public function hasAnyTwoFactorFeature(): bool
+    {
+        return $this->getTwoFactorChallengeFeature()->hasFeature()
+            || $this->getTwoFactorSetupFeature()->hasFeature();
     }
 
     public function twoFactor(
@@ -122,7 +131,7 @@ trait HasTwoFactor
         return $this;
     }
 
-    public function requiresTwoFactorChallenge(?Model $user): bool
+    public function requiresTwoFactorChallenge(?Authenticatable $user): bool
     {
         if (! $this->getTwoFactorChallengeFeature()->hasFeature()) {
             return false;
@@ -155,7 +164,7 @@ trait HasTwoFactor
         return true;
     }
 
-    public function requiresTwoFactorSetup(?Model $user): bool
+    public function requiresTwoFactorSetup(?Authenticatable $user): bool
     {
         if (! $this->shouldRequireTwoFactorSetupOnLogin()) {
             return false;
@@ -183,21 +192,30 @@ trait HasTwoFactor
         return (bool) $this->twoFactorRequireSetupOnLogin;
     }
 
-    public function startTwoFactorChallenge(Model $user, bool $remember = true): void
+    public function startTwoFactorChallenge(Authenticatable $user, bool $remember = true): void
     {
         $manager = app(TwoFactorUser::class);
         $method = $manager->getTwoFactorMethod($user, $this);
 
         $this->twoFactorSessionManager()->startChallenge($this, $user, $remember, $method);
 
-        $secret = $manager->getTwoFactorSecret($user, $this);
-
-        if (! is_string($secret) || blank($secret)) {
+        if (! $method->requiresDelivery()) {
             return;
         }
 
-        if ($method !== TwoFactorMethod::Totp) {
-            $this->dispatchTwoFactorCode($user, $method, app(Totp::class)->currentCode($secret), 'challenge');
+        $maxAttempts = $this->getTwoFactorChallengeResendMaxAttempts();
+        $throttleKey = $this->throttleKey($this->twoFactorChallengeStartThrottleKeyPart($user), includeIp: false);
+
+        $this->ensureIsNotRateLimited(
+            $throttleKey,
+            $maxAttempts,
+            fn (int $seconds) => throw TwoFactorChallengeException::rateLimited($seconds)
+        );
+
+        try {
+            $this->dispatchTwoFactorChallengeCode($user, $method);
+        } finally {
+            $this->hitRateLimiterIfThrottled($throttleKey, $maxAttempts, $this->getTwoFactorChallengeResendDecaySeconds() ?: null);
         }
     }
 
@@ -208,7 +226,7 @@ trait HasTwoFactor
 
     public function hasPendingTwoFactorChallenge(): bool
     {
-        return filled($this->getTwoFactorChallengeSession()['user_id'] ?? null);
+        return $this->hasPendingTwoFactorSession($this->getTwoFactorChallengeSession());
     }
 
     public function clearTwoFactorChallenge(): void
@@ -218,27 +236,17 @@ trait HasTwoFactor
 
     public function getPendingTwoFactorChallengeUser(): ?Authenticatable
     {
-        $challenge = $this->getTwoFactorChallengeSession();
-
-        if (! $challenge) {
-            return null;
-        }
-
-        return $this->authProvider()->retrieveById($challenge['user_id'] ?? null);
+        return $this->resolveUserFromTwoFactorSession($this->getTwoFactorChallengeSession());
     }
 
     public function getTwoFactorChallengeRemember(): bool
     {
-        return (bool) ($this->getTwoFactorChallengeSession()['remember'] ?? false);
+        return $this->rememberFromTwoFactorSession($this->getTwoFactorChallengeSession());
     }
 
     public function getPendingTwoFactorChallengeMethod(): TwoFactorMethod
     {
-        $method = TwoFactorMethod::tryFrom((string) ($this->getTwoFactorChallengeSession()['method'] ?? ''));
-
-        return $method instanceof TwoFactorMethod && $method === $this->getTwoFactorMethod()
-            ? $method
-            : TwoFactorMethod::Totp;
+        return $this->resolveTwoFactorMethodFromSession($this->getTwoFactorChallengeSession(), TwoFactorMethod::Totp);
     }
 
     public function resendPendingTwoFactorChallengeCode(): bool
@@ -251,17 +259,28 @@ trait HasTwoFactor
 
         $method = $this->getPendingTwoFactorChallengeMethod();
 
-        if ($method === TwoFactorMethod::Totp) {
+        if (! $method->requiresDelivery()) {
             return false;
         }
 
-        $throttleKey = $this->getTwoFactorChallengeResendThrottleKey($user);
-        $challengeResendMaxAttempts = $this->getTwoFactorChallengeResendMaxAttempts();
+        $maxAttempts = $this->getTwoFactorChallengeResendMaxAttempts();
+        $throttleKey = $this->throttleKey($this->twoFactorChallengeResendThrottleKeyPart($user), includeIp: false);
 
-        if ($challengeResendMaxAttempts && RateLimiter::tooManyAttempts($throttleKey, $challengeResendMaxAttempts)) {
-            throw TwoFactorChallengeException::rateLimited(RateLimiter::availableIn($throttleKey));
+        $this->ensureIsNotRateLimited(
+            $throttleKey,
+            $maxAttempts,
+            fn (int $seconds) => throw TwoFactorChallengeException::rateLimited($seconds)
+        );
+
+        try {
+            return $this->dispatchTwoFactorChallengeCode($user, $method);
+        } finally {
+            $this->hitRateLimiterIfThrottled($throttleKey, $maxAttempts, $this->getTwoFactorChallengeResendDecaySeconds() ?: null);
         }
+    }
 
+    protected function dispatchTwoFactorChallengeCode(Authenticatable $user, TwoFactorMethod $method): bool
+    {
         $secret = app(TwoFactorUser::class)->getTwoFactorSecret($user, $this);
 
         if (! is_string($secret) || blank($secret)) {
@@ -270,15 +289,40 @@ trait HasTwoFactor
 
         $this->dispatchTwoFactorCode($user, $method, app(Totp::class)->currentCode($secret), 'challenge');
 
-        $challengeResendDecaySeconds = $this->getTwoFactorChallengeResendDecaySeconds();
-        if ($challengeResendDecaySeconds) {
-            RateLimiter::hit($throttleKey, $challengeResendDecaySeconds);
-        }
-
         return true;
     }
 
-    public function startPendingTwoFactorSetup(Model $user, bool $remember = true, ?TwoFactorMethod $method = null): void
+    protected function hasPendingTwoFactorSession(?array $session): bool
+    {
+        return filled($session['user_id'] ?? null);
+    }
+
+    protected function resolveUserFromTwoFactorSession(?array $session): ?Authenticatable
+    {
+        if (! $session) {
+            return null;
+        }
+
+        try {
+            return $this->authProvider()->retrieveById($session['user_id'] ?? null);
+        } catch (UnsupportedAuthGuardException) {
+            return null;
+        }
+    }
+
+    protected function rememberFromTwoFactorSession(?array $session): bool
+    {
+        return (bool) ($session['remember'] ?? false);
+    }
+
+    protected function resolveTwoFactorMethodFromSession(?array $session, TwoFactorMethod $fallback): TwoFactorMethod
+    {
+        $method = TwoFactorMethod::tryFrom((string) ($session['method'] ?? ''));
+
+        return $method ?? $fallback;
+    }
+
+    public function startPendingTwoFactorSetup(Authenticatable $user, bool $remember = true, ?TwoFactorMethod $method = null): void
     {
         $method ??= $this->getTwoFactorMethod();
 
@@ -292,32 +336,22 @@ trait HasTwoFactor
 
     public function hasPendingTwoFactorSetup(): bool
     {
-        return filled($this->getPendingTwoFactorSetupSession()['user_id'] ?? null);
+        return $this->hasPendingTwoFactorSession($this->getPendingTwoFactorSetupSession());
     }
 
     public function getPendingTwoFactorSetupUser(): ?Authenticatable
     {
-        $setup = $this->getPendingTwoFactorSetupSession();
-
-        if (! $setup) {
-            return null;
-        }
-
-        return $this->authProvider()->retrieveById($setup['user_id'] ?? null);
+        return $this->resolveUserFromTwoFactorSession($this->getPendingTwoFactorSetupSession());
     }
 
     public function getPendingTwoFactorSetupRemember(): bool
     {
-        return (bool) ($this->getPendingTwoFactorSetupSession()['remember'] ?? false);
+        return $this->rememberFromTwoFactorSession($this->getPendingTwoFactorSetupSession());
     }
 
     public function getPendingTwoFactorSetupMethod(): TwoFactorMethod
     {
-        $method = TwoFactorMethod::tryFrom((string) ($this->getPendingTwoFactorSetupSession()['method'] ?? ''));
-
-        return $method instanceof TwoFactorMethod && $method === $this->getTwoFactorMethod()
-            ? $method
-            : $this->getTwoFactorMethod();
+        return $this->resolveTwoFactorMethodFromSession($this->getPendingTwoFactorSetupSession(), $this->getTwoFactorMethod());
     }
 
     public function completePendingTwoFactorSetupLogin(): bool
@@ -330,10 +364,7 @@ trait HasTwoFactor
             return false;
         }
 
-        $this->auth()->login($user, $this->getPendingTwoFactorSetupRemember());
-        $this->clearPendingTwoFactorSetup();
-
-        Session::regenerate();
+        app(PostAuthenticationFlow::class)->finalize($user, $this->getPendingTwoFactorSetupRemember());
 
         return true;
     }
@@ -345,7 +376,7 @@ trait HasTwoFactor
 
     public function getPendingTwoFactorSetupSessionKey(): string
     {
-        return "guardian.{$this->getId()}.two-factor.pending-setup";
+        return $this->twoFactorSessionKey('pending-setup');
     }
 
     public function setTwoFactorChallengeRememberDevice(bool $rememberDevice): void
@@ -386,9 +417,6 @@ trait HasTwoFactor
         $this->twoFactorTrustedDeviceManager()->forget($this->getTwoFactorRememberDeviceCookieName());
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
     public function listTrustedTwoFactorDevices(Model $user): array
     {
         return $this->twoFactorTrustedDeviceManager()->list($this, $user);
@@ -406,7 +434,7 @@ trait HasTwoFactor
 
     public function getTwoFactorChallengeSessionKey(): string
     {
-        return "guardian.{$this->getId()}.two-factor.challenge";
+        return $this->twoFactorSessionKey('challenge');
     }
 
     public function startTwoFactorSetup(string $secret, ?TwoFactorMethod $method = null): void
@@ -428,11 +456,7 @@ trait HasTwoFactor
 
     public function getTwoFactorSetupMethod(): TwoFactorMethod
     {
-        $method = TwoFactorMethod::tryFrom((string) ($this->getTwoFactorSetupSession()['method'] ?? ''));
-
-        return $method instanceof TwoFactorMethod && $method === $this->getTwoFactorMethod()
-            ? $method
-            : $this->getTwoFactorMethod();
+        return $this->resolveTwoFactorMethodFromSession($this->getTwoFactorSetupSession(), $this->getTwoFactorMethod());
     }
 
     public function clearTwoFactorSetup(): void
@@ -442,7 +466,7 @@ trait HasTwoFactor
 
     public function getTwoFactorSetupSessionKey(): string
     {
-        return "guardian.{$this->getId()}.two-factor.setup";
+        return $this->twoFactorSessionKey('setup');
     }
 
     public function getTwoFactorChallengeTtl(): int|false|null
@@ -460,7 +484,7 @@ trait HasTwoFactor
         return $this->twoFactorMethod;
     }
 
-    public function dispatchTwoFactorCode(Model $user, TwoFactorMethod $method, string $code, string $context): void
+    public function dispatchTwoFactorCode(Authenticatable $user, TwoFactorMethod $method, string $code, string $context): void
     {
         $this->twoFactorDeliveryManager()->dispatch(
             fortress: $this,
@@ -474,7 +498,7 @@ trait HasTwoFactor
         );
     }
 
-    protected function shouldSkipTwoFactorForRememberedDevice(Model $user): bool
+    protected function shouldSkipTwoFactorForRememberedDevice(Authenticatable $user): bool
     {
         return $this->twoFactorTrustedDeviceManager()->shouldSkipChallenge(
             fortress: $this,
@@ -484,7 +508,7 @@ trait HasTwoFactor
         );
     }
 
-    protected function isWithinTwoFactorGracePeriod(Model $user, TwoFactorUser $twoFactorUser): bool
+    protected function isWithinTwoFactorGracePeriod(Authenticatable $user, TwoFactorUser $twoFactorUser): bool
     {
         if (! is_int($this->twoFactorGracePeriodDays) || $this->twoFactorGracePeriodDays <= 0) {
             return false;
@@ -504,6 +528,11 @@ trait HasTwoFactor
         return "guardian_{$this->getId()}_remember_2fa";
     }
 
+    protected function twoFactorSessionKey(string $suffix): string
+    {
+        return "guardian.{$this->getId()}.two-factor.{$suffix}";
+    }
+
     protected function getTwoFactorChallengeResendMaxAttempts(): int|false|null
     {
         return $this->twoFactorChallengeResendMaxAttempts;
@@ -514,16 +543,24 @@ trait HasTwoFactor
         return $this->twoFactorChallengeResendDecaySeconds;
     }
 
-    protected function getTwoFactorChallengeResendThrottleKey(Model $user): string
+    protected function twoFactorChallengeResendThrottleKeyPart(Model $user): string
     {
-        return sha1(implode('|', array_filter([
-            static::class,
+        return implode('|', array_filter([
             '2fa-challenge-resend',
             $this->getId(),
             $this->getGuard(),
             (string) $user->getAuthIdentifier(),
-            (string) request()->ip(),
-        ])));
+        ]));
+    }
+
+    protected function twoFactorChallengeStartThrottleKeyPart(Authenticatable $user): string
+    {
+        return implode('|', array_filter([
+            '2fa-challenge-start',
+            $this->getId(),
+            $this->getGuard(),
+            (string) $user->getAuthIdentifier(),
+        ]));
     }
 
     protected function twoFactorSessionManager(): TwoFactorSessionManager
@@ -543,13 +580,8 @@ trait HasTwoFactor
 
     public function twoFactorRoutes(): static
     {
-        if ($this->getTwoFactorSetupFeature()->hasFeature()) {
-            $this->getTwoFactorSetupFeature()->registerRoutes();
-        }
-
-        if ($this->getTwoFactorChallengeFeature()->hasFeature()) {
-            $this->getTwoFactorChallengeFeature()->registerRoutes();
-        }
+        $this->getTwoFactorSetupFeature()->registerRoutesIfEnabled();
+        $this->getTwoFactorChallengeFeature()->registerRoutesIfEnabled();
 
         return $this;
     }

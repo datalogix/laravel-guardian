@@ -3,38 +3,20 @@
 namespace Datalogix\Guardian\Http\Responses;
 
 use Datalogix\Guardian\Guardian;
+use Datalogix\Guardian\Http\Responses\Concerns\RedirectsToTwoFactorSetup;
 use Datalogix\Guardian\Response\Redirector;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Support\Responsable;
-use Illuminate\Support\Facades\Session;
 
 class SignUpResponse implements Responsable
 {
+    use RedirectsToTwoFactorSetup;
+
     public function toResponse($request)
     {
-        if (! $this->requiresEmailVerificationPromptRedirect()) {
-            return Redirector::redirectIntended();
+        if ($this->shouldRedirectToTwoFactorSetup()) {
+            return Redirector::redirect(Guardian::getTwoFactorSetupFeature()->getUrl(), false);
         }
 
-        if (Guardian::getEmailVerificationPromptFeature()->hasFeature()) {
-            return Redirector::redirect(Guardian::getEmailVerificationPromptFeature()->getUrl(), false);
-        }
-
-        Guardian::auth()->logout();
-        Session::invalidate();
-        Session::regenerateToken();
-
-        return Redirector::redirectToLogin();
-    }
-
-    protected function requiresEmailVerificationPromptRedirect(): bool
-    {
-        if (! Guardian::isEmailVerificationRequired()) {
-            return false;
-        }
-
-        $user = Guardian::user();
-
-        return $user instanceof MustVerifyEmail && ! $user->hasVerifiedEmail();
+        return $this->redirectForRequiredEmailVerification() ?? Redirector::redirectIntended();
     }
 }

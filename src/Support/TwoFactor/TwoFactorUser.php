@@ -7,14 +7,22 @@ use Datalogix\Guardian\Contracts\CanManageTwoFactorRecoveryCodes;
 use Datalogix\Guardian\Contracts\TwoFactorAuthenticatable;
 use Datalogix\Guardian\Contracts\TwoFactorRecoveryCodeAuthenticatable;
 use Datalogix\Guardian\Enums\TwoFactorMethod;
+use Datalogix\Guardian\Exceptions\TwoFactorSecretDecryptionException;
 use Datalogix\Guardian\Fortress;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class TwoFactorUser
 {
     protected static array $columnCache = [];
+
+    protected array $resolvedSecretCache = [];
+
+    protected array $rawRecoveryCodesCache = [];
 
     protected string $recoveryCodeHashPrefix = 'sha256:';
 
@@ -22,6 +30,10 @@ class TwoFactorUser
 
     public function hasTwoFactorEnabled(mixed $user, Fortress $fortress): bool
     {
+        if ($user instanceof TwoFactorAuthenticatable) {
+            return $user->hasTwoFactorEnabled($fortress);
+        }
+
         $secret = $this->getTwoFactorSecret($user, $fortress);
 
         if (! filled($secret)) {
@@ -56,24 +68,43 @@ class TwoFactorUser
 
     public function getTwoFactorSecret(mixed $user, Fortress $fortress): ?string
     {
-        $stored = $this->getStoredTwoFactorSecret($user, $fortress);
-
-        if (! is_string($stored) || blank($stored)) {
-            return null;
-        }
-
-        return $this->parseStoredSecret($stored)['secret'] ?? null;
+        return $this->resolveStoredSecret($user, $fortress)['secret'];
     }
 
     public function getTwoFactorMethod(mixed $user, Fortress $fortress): TwoFactorMethod
     {
-        $stored = $this->getStoredTwoFactorSecret($user, $fortress);
+        return $this->resolveStoredSecret($user, $fortress)['method'];
+    }
 
-        if (! is_string($stored) || blank($stored)) {
-            return TwoFactorMethod::Totp;
+    protected function resolveStoredSecret(mixed $user, Fortress $fortress): array
+    {
+        if (! is_object($user)) {
+            return $this->buildStoredSecretParts($this->getStoredTwoFactorSecret($user, $fortress));
         }
 
-        return $this->parseStoredSecret($stored)['method'] ?? TwoFactorMethod::Totp;
+        $cacheKey = $this->secretCacheKey($user, $fortress);
+
+        return $this->resolvedSecretCache[$cacheKey] ??= $this->buildStoredSecretParts(
+            $this->getStoredTwoFactorSecret($user, $fortress)
+        );
+    }
+
+    protected function secretCacheKey(object $user, Fortress $fortress): string
+    {
+        if ($user instanceof Model) {
+            return $user::class.'|'.$user->getKey().'|'.$fortress->getId();
+        }
+
+        return spl_object_id($user).'|'.$fortress->getId();
+    }
+
+    protected function buildStoredSecretParts(?string $stored): array
+    {
+        if (! is_string($stored) || blank($stored)) {
+            return ['method' => TwoFactorMethod::Totp, 'secret' => null];
+        }
+
+        return $this->parseStoredSecret($stored);
     }
 
     protected function getStoredTwoFactorSecret(mixed $user, Fortress $fortress): ?string
@@ -88,44 +119,45 @@ class TwoFactorUser
 
         $value = $user->getAttribute($this->getSecretColumn());
 
-        return is_string($value) && filled($value) ? $value : null;
+        if (! is_string($value) || blank($value)) {
+            return null;
+        }
+
+        return $this->decryptSecret($value);
     }
 
-    /**
-     * @return array{method: TwoFactorMethod, secret: string}
-     */
+    protected function decryptSecret(string $value): ?string
+    {
+        try {
+            return Crypt::decryptString($value);
+        } catch (DecryptException $exception) {
+            report($exception);
+
+            throw new TwoFactorSecretDecryptionException(
+                'Unable to decrypt the stored two-factor secret.', previous: $exception,
+            );
+        }
+    }
+
     protected function parseStoredSecret(string $stored): array
     {
         $parts = explode($this->secretMethodSeparator, $stored, 2);
 
-        if (count($parts) !== 2) {
-            return [
-                'method' => TwoFactorMethod::Totp,
-                'secret' => $stored,
-            ];
+        if (count($parts) === 2) {
+            [$method, $secret] = $parts;
+            $resolvedMethod = TwoFactorMethod::tryFrom($method);
+
+            if ($resolvedMethod instanceof TwoFactorMethod && filled($secret)) {
+                return ['method' => $resolvedMethod, 'secret' => $secret];
+            }
         }
 
-        [$method, $secret] = $parts;
-
-        $resolvedMethod = TwoFactorMethod::tryFrom($method);
-
-        if (! $resolvedMethod instanceof TwoFactorMethod || blank($secret)) {
-            return [
-                'method' => TwoFactorMethod::Totp,
-                'secret' => $stored,
-            ];
-        }
-
-        return [
-            'method' => $resolvedMethod,
-            'secret' => $secret,
-        ];
+        return ['method' => TwoFactorMethod::Totp, 'secret' => $stored];
     }
 
     public function canStoreTwoFactorSecret(mixed $user): bool
     {
-        return $user instanceof CanManageTwoFactorAuthentication
-            || ($user instanceof Model && $this->hasSecretColumn($user));
+        return $this->canUseContractOrColumn($user, CanManageTwoFactorAuthentication::class, $this->getSecretColumn());
     }
 
     public function saveTwoFactorSecret(mixed $user, Fortress $fortress, ?string $secret): bool
@@ -135,6 +167,8 @@ class TwoFactorUser
 
             $this->saveTwoFactorConfirmedAt($user, $secret !== null ? now() : null);
 
+            $this->forgetResolvedSecretCache($user, $fortress);
+
             return true;
         }
 
@@ -142,7 +176,7 @@ class TwoFactorUser
             return false;
         }
 
-        $attributes = [$this->getSecretColumn() => $secret];
+        $attributes = [$this->getSecretColumn() => $secret !== null ? Crypt::encryptString($secret) : null];
 
         if ($this->hasConfirmedAtColumn($user)) {
             $attributes[$this->getConfirmedAtColumn()] = $secret !== null ? now() : null;
@@ -150,7 +184,18 @@ class TwoFactorUser
 
         $user->forceFill($attributes)->save();
 
+        $this->forgetResolvedSecretCache($user, $fortress);
+
         return true;
+    }
+
+    protected function forgetResolvedSecretCache(mixed $user, Fortress $fortress): void
+    {
+        if (! is_object($user)) {
+            return;
+        }
+
+        unset($this->resolvedSecretCache[$this->secretCacheKey($user, $fortress)]);
     }
 
     public function saveTwoFactorConfirmedAt(mixed $user, Carbon|string|int|null $confirmedAt): bool
@@ -164,64 +209,19 @@ class TwoFactorUser
         return true;
     }
 
-    /**
-     * @return array<int, string>
-     */
     public function getTwoFactorRecoveryCodes(mixed $user, Fortress $fortress): array
     {
-        if ($user instanceof TwoFactorRecoveryCodeAuthenticatable) {
-            return array_values(array_filter($user->getTwoFactorRecoveryCodes($fortress), fn ($code) => is_string($code) && filled($code)));
-        }
-
-        if (! $user instanceof Model || ! $this->hasRecoveryCodesColumn($user)) {
-            return [];
-        }
-
-        $value = $user->getAttribute($this->getRecoveryCodesColumn());
-
-        if (is_array($value)) {
-            return array_values(array_filter($value, fn ($code) => is_string($code) && filled($code) && ! $this->isHashedRecoveryCode($code)));
-        }
-
-        if (is_string($value) && filled($value)) {
-            $decoded = json_decode($value, true);
-
-            if (is_array($decoded)) {
-                return array_values(array_filter($decoded, fn ($code) => is_string($code) && filled($code) && ! $this->isHashedRecoveryCode($code)));
-            }
-        }
-
-        return [];
+        return $this->filterRecoveryCodes($this->rawStoredRecoveryCodes($user, $fortress), excludeHashed: true);
     }
 
     public function canStoreTwoFactorRecoveryCodes(mixed $user): bool
     {
-        return $user instanceof CanManageTwoFactorRecoveryCodes
-            || ($user instanceof Model && $this->hasRecoveryCodesColumn($user));
+        return $this->canUseContractOrColumn($user, CanManageTwoFactorRecoveryCodes::class, $this->getRecoveryCodesColumn());
     }
 
-    /**
-     * @param  array<int, string>  $codes
-     */
     public function saveTwoFactorRecoveryCodes(mixed $user, Fortress $fortress, array $codes): bool
     {
-        if ($user instanceof CanManageTwoFactorRecoveryCodes) {
-            $user->saveTwoFactorRecoveryCodes($fortress, $codes);
-
-            return true;
-        }
-
-        if (! $user instanceof Model || ! $this->hasRecoveryCodesColumn($user)) {
-            return false;
-        }
-
-        $hashedCodes = array_map(fn (string $code) => $this->hashRecoveryCode($code), array_values($codes));
-
-        $user->forceFill([
-            $this->getRecoveryCodesColumn() => json_encode($hashedCodes),
-        ])->save();
-
-        return true;
+        return $this->persistTwoFactorRecoveryCodes($user, $fortress, $codes, alreadyHashed: false);
     }
 
     public function getTwoFactorRecoveryCodesCount(mixed $user, Fortress $fortress): int
@@ -235,13 +235,64 @@ class TwoFactorUser
             return false;
         }
 
-        $available = $this->getStoredTwoFactorRecoveryCodes($user, $fortress);
         $normalizedCandidate = $this->normalizeRecoveryCode($candidate);
 
         if (blank($normalizedCandidate)) {
             return false;
         }
 
+        if (
+            $user instanceof Model
+            && ! $user instanceof CanManageTwoFactorRecoveryCodes
+            && $this->hasRecoveryCodesColumn($user)
+        ) {
+            return $this->consumeStoredRecoveryCodeWithLock($user, $fortress, $normalizedCandidate);
+        }
+
+        $remaining = $this->extractRemainingRecoveryCodes(
+            $this->getStoredTwoFactorRecoveryCodes($user, $fortress),
+            $normalizedCandidate,
+        );
+
+        if ($remaining === null) {
+            return false;
+        }
+
+        return $this->persistTwoFactorRecoveryCodes($user, $fortress, $remaining, alreadyHashed: true);
+    }
+
+    protected function consumeStoredRecoveryCodeWithLock(Model $user, Fortress $fortress, string $normalizedCandidate): bool
+    {
+        return DB::transaction(function () use ($user, $fortress, $normalizedCandidate) {
+            $locked = $user->newQuery()->lockForUpdate()->find($user->getKey());
+
+            if (! $locked) {
+                return false;
+            }
+
+            $available = $this->filterRecoveryCodes(
+                $this->decodeStoredRecoveryCodesValue($locked->getAttribute($this->getRecoveryCodesColumn()))
+            );
+
+            $remaining = $this->extractRemainingRecoveryCodes($available, $normalizedCandidate);
+
+            if ($remaining === null) {
+                return false;
+            }
+
+            $locked->forceFill([
+                $this->getRecoveryCodesColumn() => json_encode(array_values($remaining)),
+            ])->save();
+
+            $this->forgetRawRecoveryCodesCache($user, $fortress);
+
+            return true;
+        });
+    }
+
+    protected function extractRemainingRecoveryCodes(array $available, string $normalizedCandidate): ?array
+    {
+        $hashedCandidate = $this->hashRecoveryCode($normalizedCandidate);
         $remaining = [];
         $consumed = false;
 
@@ -250,7 +301,7 @@ class TwoFactorUser
                 continue;
             }
 
-            if (! $consumed && $this->isRecoveryCodeMatch($code, $normalizedCandidate)) {
+            if (! $consumed && $this->isRecoveryCodeMatch($code, $normalizedCandidate, $hashedCandidate)) {
                 $consumed = true;
 
                 continue;
@@ -259,12 +310,15 @@ class TwoFactorUser
             $remaining[] = $code;
         }
 
-        if (! $consumed) {
-            return false;
-        }
+        return $consumed ? $remaining : null;
+    }
 
+    protected function persistTwoFactorRecoveryCodes(mixed $user, Fortress $fortress, array $codes, bool $alreadyHashed): bool
+    {
         if ($user instanceof CanManageTwoFactorRecoveryCodes) {
-            $user->saveTwoFactorRecoveryCodes($fortress, $remaining);
+            $user->saveTwoFactorRecoveryCodes($fortress, $codes);
+
+            $this->forgetRawRecoveryCodesCache($user, $fortress);
 
             return true;
         }
@@ -273,11 +327,32 @@ class TwoFactorUser
             return false;
         }
 
+        $codes = $alreadyHashed
+            ? array_values($codes)
+            : array_map(fn (string $code) => $this->hashRecoveryCode($code), array_values($codes));
+
         $user->forceFill([
-            $this->getRecoveryCodesColumn() => json_encode(array_values($remaining)),
+            $this->getRecoveryCodesColumn() => json_encode($codes),
         ])->save();
 
+        $this->forgetRawRecoveryCodesCache($user, $fortress);
+
         return true;
+    }
+
+    protected function forgetRawRecoveryCodesCache(mixed $user, Fortress $fortress): void
+    {
+        if (! is_object($user)) {
+            return;
+        }
+
+        unset($this->rawRecoveryCodesCache[$this->secretCacheKey($user, $fortress)]);
+    }
+
+    protected function canUseContractOrColumn(mixed $user, string $contract, string $column): bool
+    {
+        return $user instanceof $contract
+            || ($user instanceof Model && $this->hasColumn($user, $column));
     }
 
     protected function hasSecretColumn(Model $user): bool
@@ -305,7 +380,9 @@ class TwoFactorUser
 
         try {
             return self::$columnCache[$cacheKey] = Schema::connection($user->getConnectionName())->hasColumn($user->getTable(), $column);
-        } catch (\Throwable) {
+        } catch (\Throwable $exception) {
+            report($exception);
+
             return self::$columnCache[$cacheKey] = false;
         }
     }
@@ -325,34 +402,58 @@ class TwoFactorUser
         return 'two_factor_confirmed_at';
     }
 
-    /**
-     * @return array<int, string>
-     */
     protected function getStoredTwoFactorRecoveryCodes(mixed $user, Fortress $fortress): array
     {
+        return $this->filterRecoveryCodes($this->rawStoredRecoveryCodes($user, $fortress));
+    }
+
+    protected function rawStoredRecoveryCodes(mixed $user, Fortress $fortress): array
+    {
+        if (! is_object($user)) {
+            return $this->resolveRawStoredRecoveryCodes($user, $fortress);
+        }
+
+        $cacheKey = $this->secretCacheKey($user, $fortress);
+
+        return $this->rawRecoveryCodesCache[$cacheKey] ??= $this->resolveRawStoredRecoveryCodes($user, $fortress);
+    }
+
+    protected function resolveRawStoredRecoveryCodes(mixed $user, Fortress $fortress): array
+    {
         if ($user instanceof TwoFactorRecoveryCodeAuthenticatable) {
-            return array_values(array_filter($user->getTwoFactorRecoveryCodes($fortress), fn ($code) => is_string($code) && filled($code)));
+            return $user->getTwoFactorRecoveryCodes($fortress);
         }
 
         if (! $user instanceof Model || ! $this->hasRecoveryCodesColumn($user)) {
             return [];
         }
 
-        $value = $user->getAttribute($this->getRecoveryCodesColumn());
+        return $this->decodeStoredRecoveryCodesValue($user->getAttribute($this->getRecoveryCodesColumn()));
+    }
 
+    protected function decodeStoredRecoveryCodesValue(mixed $value): array
+    {
         if (is_array($value)) {
-            return array_values(array_filter($value, fn ($code) => is_string($code) && filled($code)));
+            return $value;
         }
 
         if (is_string($value) && filled($value)) {
             $decoded = json_decode($value, true);
 
             if (is_array($decoded)) {
-                return array_values(array_filter($decoded, fn ($code) => is_string($code) && filled($code)));
+                return $decoded;
             }
         }
 
         return [];
+    }
+
+    protected function filterRecoveryCodes(array $codes, bool $excludeHashed = false): array
+    {
+        return array_values(array_filter(
+            $codes,
+            fn ($code) => is_string($code) && filled($code) && (! $excludeHashed || ! $this->isHashedRecoveryCode($code)),
+        ));
     }
 
     protected function normalizeRecoveryCode(string $code): string
@@ -370,10 +471,10 @@ class TwoFactorUser
         return str_starts_with($code, $this->recoveryCodeHashPrefix);
     }
 
-    protected function isRecoveryCodeMatch(string $storedCode, string $normalizedCandidate): bool
+    protected function isRecoveryCodeMatch(string $storedCode, string $normalizedCandidate, string $hashedCandidate): bool
     {
         if ($this->isHashedRecoveryCode($storedCode)) {
-            return hash_equals($storedCode, $this->hashRecoveryCode($normalizedCandidate));
+            return hash_equals($storedCode, $hashedCandidate);
         }
 
         return hash_equals($this->normalizeRecoveryCode($storedCode), $normalizedCandidate);

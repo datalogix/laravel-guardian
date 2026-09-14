@@ -7,9 +7,6 @@ use InvalidArgumentException;
 
 class FrameworkResolver
 {
-    /**
-     * @var array<string, ComponentFactory>
-     */
     protected array $factories = [];
 
     public function register(Framework $framework, ComponentFactory $factory): void
@@ -19,7 +16,11 @@ class FrameworkResolver
 
     public function resolveComponent(string $componentName, ?Framework $framework = null): string
     {
-        $framework ??= Framework::tryFrom(config('guardian.framework'));
+        if (! $framework) {
+            $config = config('guardian.framework');
+
+            $framework = $config instanceof Framework ? $config : Framework::tryFrom($config);
+        }
 
         if (! $framework) {
             throw new InvalidArgumentException('Unknown framework configured');

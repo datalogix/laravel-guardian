@@ -6,6 +6,7 @@ use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
 use Datalogix\Guardian\Exceptions\PasswordConfirmationException;
 use Datalogix\Guardian\Guardian;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Timebox;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class ConfirmPassword implements HasValidationRules
@@ -21,15 +22,42 @@ class ConfirmPassword implements HasValidationRules
             throw PasswordConfirmationException::invalid();
         }
 
-        $this->throttleAction(function () use ($data, $auth, $user) {
-            $data['email'] = $user->email;
+        $maxAttempts = Guardian::getPasswordConfirmationFeature()->getMaxAttempts();
+        $throttleKey = $this->throttleKey($auth->id(), includeIp: false);
 
-            if (! $auth->validate($data)) {
-                throw PasswordConfirmationException::invalid();
-            }
+        $this->ensureIsNotRateLimited(
+            $throttleKey,
+            $maxAttempts,
+            fn (int $seconds) => throw PasswordConfirmationException::rateLimited($seconds)
+        );
 
-            Session::put('auth.password_confirmed_at', time());
-        }, $auth->id(), Guardian::getPasswordConfirmationFeature()->getMaxAttempts());
+        $identifierKey = Guardian::getIdentifierKey();
+
+        $credentials = [
+            ...$data,
+            ...[$identifierKey->value => data_get($user, $identifierKey->value)],
+        ];
+
+        if (! $this->timeboxedValidate($auth, $credentials)) {
+            $this->hitRateLimiterIfThrottled($throttleKey, $maxAttempts);
+
+            throw PasswordConfirmationException::invalid();
+        }
+
+        $this->clearRateLimiterIfThrottled($throttleKey, $maxAttempts);
+
+        Session::put('auth.password_confirmed_at', time());
+    }
+
+    protected function timeboxedValidate($auth, array $credentials): bool
+    {
+        return app(Timebox::class)->call(function ($timebox) use ($auth, $credentials) {
+            $valid = $auth->validate($credentials);
+
+            $timebox->returnEarly();
+
+            return $valid;
+        }, config('auth.timebox_duration', 200000));
     }
 
     public static function rules(): array

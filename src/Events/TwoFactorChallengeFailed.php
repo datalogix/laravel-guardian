@@ -12,7 +12,7 @@ class TwoFactorChallengeFailed
 
     public function __construct(
         public readonly Fortress $fortress,
-        public readonly ?Model $user,
+        public readonly ?Model $user = null,
         public readonly string $reason = 'invalid',
     ) {}
 }

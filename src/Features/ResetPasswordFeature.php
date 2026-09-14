@@ -4,7 +4,6 @@ namespace Datalogix\Guardian\Features;
 
 use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
 use Datalogix\Guardian\Http\Responses\ResetPasswordResponse;
-use Illuminate\Support\Facades\Route;
 
 class ResetPasswordFeature extends Feature
 {
@@ -40,8 +39,6 @@ class ResetPasswordFeature extends Feature
 
     public function registerRoutes(): void
     {
-        Route::get($this->getRouteSlug().'/{token?}', $this->getRouteAction())
-            ->middleware(RedirectIfAuthenticated::class, 'signed')
-            ->name($this->getRouteName());
+        $this->registerRoute('get', $this->getRouteSlug().'/{token?}', [RedirectIfAuthenticated::class, 'signed']);
     }
 }

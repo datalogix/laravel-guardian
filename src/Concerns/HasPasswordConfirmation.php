@@ -59,9 +59,7 @@ trait HasPasswordConfirmation
 
     public function passwordConfirmationRoutes(): static
     {
-        if ($this->getPasswordConfirmationFeature()->hasFeature()) {
-            $this->getPasswordConfirmationFeature()->registerRoutes();
-        }
+        $this->getPasswordConfirmationFeature()->registerRoutesIfEnabled();
 
         return $this;
     }

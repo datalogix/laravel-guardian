@@ -2,18 +2,14 @@
 
 namespace Datalogix\Guardian\Framework;
 
+use RuntimeException;
+
 class InertiaComponentFactory implements ComponentFactory
 {
     public function resolve(string $componentName): string
     {
-        return match ($componentName) {
-            'login' => \Datalogix\Guardian\Http\Inertia\Login::class,
-            'sign-up' => \Datalogix\Guardian\Http\Inertia\SignUp::class,
-            'forgot-password' => \Datalogix\Guardian\Http\Inertia\ForgotPassword::class,
-            'reset-password' => \Datalogix\Guardian\Http\Inertia\ResetPassword::class,
-            'confirm-password' => \Datalogix\Guardian\Http\Inertia\ConfirmPassword::class,
-            'email-verification-prompt' => \Datalogix\Guardian\Http\Inertia\EmailVerificationPrompt::class,
-            default => throw new \InvalidArgumentException("Unknown component [{$componentName}]."),
-        };
+        throw new RuntimeException(
+            "The Inertia framework integration is not implemented yet. Use Framework::Livewire (config('guardian.framework')) instead."
+        );
     }
 }

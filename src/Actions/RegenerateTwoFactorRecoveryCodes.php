@@ -3,25 +3,32 @@
 namespace Datalogix\Guardian\Actions;
 
 use Datalogix\Guardian\Exceptions\PasswordConfirmationException;
+use Datalogix\Guardian\Exceptions\TwoFactorSetupException;
+use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorLifecycleManager;
 
 class RegenerateTwoFactorRecoveryCodes
 {
+    use Concerns\HasRateLimiter;
     use Concerns\HasRecentPasswordConfirmation;
 
     public function __construct(
         protected TwoFactorLifecycleManager $lifecycleManager,
     ) {}
 
-    /**
-     * @return array<int, string>
-     */
     public function __invoke(object $user): array
     {
         if (! $this->passwordWasRecentlyConfirmed()) {
             throw PasswordConfirmationException::requiredForRegeneratingRecoveryCodes();
         }
 
-        return $this->lifecycleManager->regenerateRecoveryCodes($user);
+        return $this->throttleAction(
+            fn () => $this->lifecycleManager->regenerateRecoveryCodes($user),
+            fn (int $seconds) => throw TwoFactorSetupException::rateLimited($seconds),
+            $this->userKey($user),
+            Guardian::getTwoFactorSetupFeature()->getMaxAttempts(),
+            includeIp: false,
+            clearOnSuccess: true,
+        );
     }
 }

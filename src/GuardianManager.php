@@ -3,6 +3,7 @@
 namespace Datalogix\Guardian;
 
 use Closure;
+use Datalogix\Guardian\Enums\AuthFlowResult;
 use Datalogix\Guardian\Events\FortressBootCompleted;
 use Datalogix\Guardian\Events\FortressBootFailed;
 use Datalogix\Guardian\Events\FortressBootStarting;
@@ -147,6 +148,16 @@ class GuardianManager
     public function setServingStatus(bool $condition = true): void
     {
         $this->isServing = $condition;
+    }
+
+    public function respondToAuthFlow(AuthFlowResult $result, string $defaultResponseClass): mixed
+    {
+        return match ($result) {
+            AuthFlowResult::ChallengeRequired => app(Guardian::getTwoFactorChallengeFeature()->getResponse()),
+            AuthFlowResult::OAuthRegistrationRequired => app(Guardian::getOAuthCompleteRegistrationFeature()->getResponse()),
+            AuthFlowResult::SetupRequired => app(Guardian::getTwoFactorSetupFeature()->getResponse()),
+            AuthFlowResult::Authenticated => app($defaultResponseClass),
+        };
     }
 
     public function __call($method, $parameters)

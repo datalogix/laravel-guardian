@@ -3,7 +3,8 @@
 namespace Datalogix\Guardian\Support\TwoFactor;
 
 use Datalogix\Guardian\Fortress;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -16,7 +17,7 @@ class TrustedDevices
         return Schema::hasTable($this->table);
     }
 
-    public function issue(Fortress $fortress, Model $user, int $days = 30, ?string $name = null): ?array
+    public function issue(Fortress $fortress, Authenticatable $user, int $days = 30, ?string $name = null): ?array
     {
         if (! $this->isAvailable()) {
             return null;
@@ -28,11 +29,8 @@ class TrustedDevices
         $expiresAt = now()->addDays(max(1, $days));
 
         $id = DB::table($this->table)->insertGetId([
-            'fortress_id' => $fortress->getId(),
-            'auth_guard' => $fortress->getGuard(),
-            'authenticatable_type' => $user::class,
-            'authenticatable_id' => (string) $user->getAuthIdentifier(),
-            'name' => $name,
+            ...$this->userAttributes($fortress, $user),
+            'name' => $name ?? $this->guessDeviceName(),
             'ip_address' => request()->ip(),
             'user_agent' => request()->userAgent(),
             'token_hash' => $tokenHash,
@@ -49,18 +47,13 @@ class TrustedDevices
         ];
     }
 
-    public function touchIfValid(Fortress $fortress, Model $user, int $deviceId, string $token): bool
+    public function touchIfValid(Fortress $fortress, Authenticatable $user, int $deviceId, string $token): bool
     {
         if (! $this->isAvailable()) {
             return false;
         }
 
-        $record = DB::table($this->table)
-            ->where('id', $deviceId)
-            ->where('fortress_id', $fortress->getId())
-            ->where('auth_guard', $fortress->getGuard())
-            ->where('authenticatable_type', $user::class)
-            ->where('authenticatable_id', (string) $user->getAuthIdentifier())
+        $record = $this->scopeForUser(DB::table($this->table)->where('id', $deviceId), $fortress, $user)
             ->whereNull('revoked_at')
             ->first();
 
@@ -88,20 +81,13 @@ class TrustedDevices
         return true;
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function list(Fortress $fortress, Model $user): array
+    public function list(Fortress $fortress, Authenticatable $user): array
     {
         if (! $this->isAvailable()) {
             return [];
         }
 
-        return DB::table($this->table)
-            ->where('fortress_id', $fortress->getId())
-            ->where('auth_guard', $fortress->getGuard())
-            ->where('authenticatable_type', $user::class)
-            ->where('authenticatable_id', (string) $user->getAuthIdentifier())
+        return $this->scopeForUser(DB::table($this->table), $fortress, $user)
             ->whereNull('revoked_at')
             ->where(function ($query) {
                 $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
@@ -112,18 +98,13 @@ class TrustedDevices
             ->all();
     }
 
-    public function revoke(int $deviceId, Fortress $fortress, Model $user): bool
+    public function revoke(int $deviceId, Fortress $fortress, Authenticatable $user): bool
     {
         if (! $this->isAvailable()) {
             return false;
         }
 
-        return DB::table($this->table)
-            ->where('id', $deviceId)
-            ->where('fortress_id', $fortress->getId())
-            ->where('auth_guard', $fortress->getGuard())
-            ->where('authenticatable_type', $user::class)
-            ->where('authenticatable_id', (string) $user->getAuthIdentifier())
+        return $this->scopeForUser(DB::table($this->table)->where('id', $deviceId), $fortress, $user)
             ->whereNull('revoked_at')
             ->update([
                 'revoked_at' => now(),
@@ -131,17 +112,13 @@ class TrustedDevices
             ]) > 0;
     }
 
-    public function revokeAll(Fortress $fortress, Model $user): int
+    public function revokeAll(Fortress $fortress, Authenticatable $user): int
     {
         if (! $this->isAvailable()) {
             return 0;
         }
 
-        return DB::table($this->table)
-            ->where('fortress_id', $fortress->getId())
-            ->where('auth_guard', $fortress->getGuard())
-            ->where('authenticatable_type', $user::class)
-            ->where('authenticatable_id', (string) $user->getAuthIdentifier())
+        return $this->scopeForUser(DB::table($this->table), $fortress, $user)
             ->whereNull('revoked_at')
             ->update([
                 'revoked_at' => now(),
@@ -169,5 +146,56 @@ class TrustedDevices
                 });
             })
             ->delete();
+    }
+
+    protected function scopeForUser(Builder $query, Fortress $fortress, Authenticatable $user): Builder
+    {
+        return $query
+            ->where('fortress_id', $fortress->getId())
+            ->where('auth_guard', $fortress->getGuard())
+            ->where('authenticatable_type', $user::class)
+            ->where('authenticatable_id', (string) $user->getAuthIdentifier());
+    }
+
+    protected function guessDeviceName(): ?string
+    {
+        $userAgent = (string) request()->userAgent();
+
+        if (blank($userAgent)) {
+            return null;
+        }
+
+        $browser = match (true) {
+            (bool) preg_match('/Edg\//', $userAgent) => 'Edge',
+            (bool) preg_match('/OPR\//', $userAgent) => 'Opera',
+            (bool) preg_match('/(Chrome|CriOS)\//', $userAgent) => 'Chrome',
+            (bool) preg_match('/Firefox\//', $userAgent) => 'Firefox',
+            (bool) preg_match('#Version/.*Safari/#', $userAgent) => 'Safari',
+            default => null,
+        };
+
+        $platform = match (true) {
+            (bool) preg_match('/iPhone/', $userAgent) => 'iPhone',
+            (bool) preg_match('/iPad/', $userAgent) => 'iPad',
+            (bool) preg_match('/Android/', $userAgent) => 'Android',
+            (bool) preg_match('/Mac OS X/', $userAgent) => 'macOS',
+            (bool) preg_match('/Windows/', $userAgent) => 'Windows',
+            (bool) preg_match('/Linux/', $userAgent) => 'Linux',
+            default => null,
+        };
+
+        $name = trim(implode(' on ', array_filter([$browser, $platform])));
+
+        return blank($name) ? null : $name;
+    }
+
+    protected function userAttributes(Fortress $fortress, Authenticatable $user): array
+    {
+        return [
+            'fortress_id' => $fortress->getId(),
+            'auth_guard' => $fortress->getGuard(),
+            'authenticatable_type' => $user::class,
+            'authenticatable_id' => (string) $user->getAuthIdentifier(),
+        ];
     }
 }

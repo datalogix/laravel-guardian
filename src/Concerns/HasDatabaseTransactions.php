@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 
 trait HasDatabaseTransactions
 {
-    protected bool|Closure $hasDatabaseTransactions = false;
+    protected bool|Closure $hasDatabaseTransactions = true;
 
     public function databaseTransactions(bool|Closure $condition = true): static
     {

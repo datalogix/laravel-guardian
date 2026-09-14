@@ -1,3 +1,5 @@
 <tk:page.auth.forgot-password
-    :login="guardian()->loginUrl()"
+    identifier:name="login"
+    :identifier="$identifierKey->value"
+    :login-url="guardian()->loginUrl()"
 />

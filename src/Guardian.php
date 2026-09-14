@@ -5,9 +5,9 @@ namespace Datalogix\Guardian;
 use Illuminate\Support\Facades\Facade;
 
 /**
- * @see \Datalogix\Guardian\GuardianManager
+ * @see GuardianManager
  *
- * @mixin \Datalogix\Guardian\Fortress
+ * @mixin Fortress
  */
 class Guardian extends Facade
 {

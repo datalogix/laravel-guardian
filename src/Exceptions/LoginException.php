@@ -2,31 +2,28 @@
 
 namespace Datalogix\Guardian\Exceptions;
 
-use Illuminate\Contracts\Auth\Guard;
-use Illuminate\Contracts\Auth\StatefulGuard;
+use Datalogix\Guardian\Exceptions\Concerns\HasRateLimitedMessage;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Validation\ValidationException;
 
 class LoginException extends ValidationException
 {
+    use HasRateLimitedMessage;
+
     public static function invalid(): static
     {
         return static::withMessages(['login' => [__('auth.failed')]]);
     }
 
-    public static function cannotAccess(Guard|StatefulGuard $auth): static
+    public static function cannotAccess(): static
     {
-        $message = __('auth.cannot-access') === 'auth.cannot-access' ? __('auth.failed') : __('auth.cannot-access');
+        $message = Lang::has('auth.cannot-access') ? __('auth.cannot-access') : __('auth.failed');
 
         return static::withMessages(['login' => [$message]]);
     }
 
     public static function rateLimited(int $seconds): static
     {
-        return static::withMessages([
-            'login' => [__('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ])],
-        ]);
+        return static::rateLimitedMessage('login', $seconds);
     }
 }

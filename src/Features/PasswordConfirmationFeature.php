@@ -3,7 +3,6 @@
 namespace Datalogix\Guardian\Features;
 
 use Datalogix\Guardian\Http\Responses\PasswordConfirmationResponse;
-use Illuminate\Support\Facades\Route;
 
 class PasswordConfirmationFeature extends Feature
 {
@@ -39,7 +38,6 @@ class PasswordConfirmationFeature extends Feature
 
     public function registerRoutes(): void
     {
-        Route::get($this->getRouteSlug(), $this->getRouteAction())
-            ->name($this->getRouteName());
+        $this->registerRoute('get', $this->getRouteSlug(), $this->fortress->getAuthMiddleware());
     }
 }

@@ -2,42 +2,12 @@
 
 namespace Datalogix\Guardian\Http\Middleware;
 
-use Closure;
-use Datalogix\Guardian\Guardian;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
+use Datalogix\Guardian\Support\TwoFactor\PendingTwoFactorSetupStep;
 
-class EnsureTwoFactorSetupAccess
+class EnsureTwoFactorSetupAccess extends EnsurePendingAuthStepAccess
 {
-    public function handle(Request $request, Closure $next): Response
+    public function __construct(PendingTwoFactorSetupStep $step)
     {
-        if (Guardian::isAuthenticated()) {
-            $user = Guardian::user();
-
-            if ($user instanceof Model && Guardian::cannotAccess($user)) {
-                abort(403);
-            }
-
-            return $next($request);
-        }
-
-        if (Guardian::hasPendingTwoFactorSetup()) {
-            $pendingUser = Guardian::getPendingTwoFactorSetupUser();
-
-            if (! $pendingUser instanceof Model) {
-                Guardian::clearPendingTwoFactorSetup();
-
-                return redirect()->guest(Guardian::getLoginFeature()->getUrl());
-            }
-
-            if (Guardian::cannotAccess($pendingUser)) {
-                abort(403);
-            }
-
-            return $next($request);
-        }
-
-        return redirect()->guest(Guardian::getLoginFeature()->getUrl());
+        parent::__construct($step);
     }
 }

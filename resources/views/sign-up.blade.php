@@ -1,14 +1,6 @@
-@php
-use Datalogix\Guardian\Enums\IdentifierKey;
-@endphp
-
-<tk:page.auth.sign-up :login="guardian()->loginUrl()">
-    @if ($identifierKey !== IdentifierKey::Email)
-        <tk:input
-            name="username"
-            required
-            autocomplete="username"
-            placeholder
-        />
-    @endif
-</tk:page.auth.sign-up>
+<tk:page.auth.sign-up
+    identifier:name="login"
+    :identifier="$identifierKey->value"
+    :login-url="guardian()->loginUrl()"
+    :oauth="guardian()->getOAuthProviders()"
+/>

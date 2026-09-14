@@ -2,10 +2,12 @@
 
 namespace Datalogix\Guardian\Features;
 
+use Closure;
 use Datalogix\Guardian\Http\Controllers\OAuthController;
 use Datalogix\Guardian\Http\Middleware\RedirectIfAuthenticated;
 use Datalogix\Guardian\Http\Responses\LoginResponse;
 use Illuminate\Support\Facades\Route;
+use InvalidArgumentException;
 
 class OAuthFeature extends Feature
 {
@@ -51,22 +53,22 @@ class OAuthFeature extends Feature
 
     public function registerRoutes(): void
     {
+        $action = $this->getRouteAction();
+
+        if ($action instanceof Closure || is_array($action)) {
+            throw new InvalidArgumentException('The OAuth feature route action must be a single controller class name with redirect() and callback() methods — a Closure or a [class, method] array cannot handle both the redirect and callback routes.');
+        }
+
         Route::prefix(trim($this->getRouteSlug(), '/'))
             ->name($this->getRouteName().'.')
-            ->group(function () {
-                Route::get('{provider}/redirect', [$this->getRouteAction(), 'redirect'])
-                    ->middleware(array_filter([
-                        RedirectIfAuthenticated::class,
-                        $this->getMaxAttempts() ? 'throttle:'.$this->getMaxAttempts().',1' : null,
-                    ]))
+            ->group(function () use ($action) {
+                Route::get('{provider}/redirect', [$action, 'redirect'])
+                    ->middleware(array_filter([RedirectIfAuthenticated::class, $this->throttleMiddleware()]))
                     ->where('provider', '[A-Za-z0-9_-]+')
                     ->name('redirect');
 
-                Route::get('{provider}/callback', [$this->getRouteAction(), 'callback'])
-                    ->middleware(array_filter([
-                        RedirectIfAuthenticated::class,
-                        $this->getMaxAttempts() ? 'throttle:'.$this->getMaxAttempts().',1' : null,
-                    ]))
+                Route::get('{provider}/callback', [$action, 'callback'])
+                    ->middleware(array_filter([RedirectIfAuthenticated::class, $this->throttleMiddleware()]))
                     ->where('provider', '[A-Za-z0-9_-]+')
                     ->name('callback');
             });

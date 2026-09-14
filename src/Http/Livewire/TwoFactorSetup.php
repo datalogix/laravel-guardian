@@ -7,18 +7,28 @@ use Datalogix\Guardian\Actions\EnableTwoFactor;
 use Datalogix\Guardian\Actions\PrepareTwoFactorSetup;
 use Datalogix\Guardian\Actions\RegenerateTwoFactorRecoveryCodes;
 use Datalogix\Guardian\Enums\TwoFactorMethod;
+use Datalogix\Guardian\Exceptions\PasswordConfirmationException;
+use Datalogix\Guardian\Exceptions\TwoFactorSecretDecryptionException;
 use Datalogix\Guardian\Guardian;
+use Datalogix\Guardian\Http\Concerns\ChecksTwoFactorSetupAccess;
+use Datalogix\Guardian\Http\Responses\Concerns\RedirectsToTwoFactorSetup;
 use Datalogix\Guardian\Response\Redirector;
 use Datalogix\Guardian\Support\TwoFactor\QrCode;
 use Datalogix\Guardian\Support\TwoFactor\Totp;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorUser;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Session;
 
 class TwoFactorSetup extends Page
 {
+    use ChecksTwoFactorSetupAccess;
+    use RedirectsToTwoFactorSetup;
+
     public ?TwoFactorMethod $method = null;
 
     public bool $enabled = false;
+
+    public bool $secretUnreadable = false;
 
     public string $code = '';
 
@@ -32,15 +42,13 @@ class TwoFactorSetup extends Page
 
     public int $recoveryCodesCount = 0;
 
-    /**
-     * @var array<int, string>
-     */
     public array $recoveryCodes = [];
 
-    /**
-     * @var array<int, array<string, mixed>>
-     */
     public array $trustedDevices = [];
+
+    public bool $awaitingContinueAfterSetup = false;
+
+    protected bool $recoveryCodesFreshlyGenerated = false;
 
     public function mount(): void
     {
@@ -50,24 +58,36 @@ class TwoFactorSetup extends Page
             return;
         }
 
+        $this->abortIfCannotAccessTwoFactorSetup($this->resolveSetupUser());
+
+        $this->recoveryCodesFreshlyGenerated = false;
+
         $this->syncState();
 
-        $this->method = Guardian::getTwoFactorSetupMethod();
+        $this->method = Guardian::hasPendingTwoFactorSetup()
+            ? Guardian::getPendingTwoFactorSetupMethod()
+            : Guardian::getTwoFactorSetupMethod();
 
-        if (! $this->enabled && filled(Guardian::getTwoFactorSetupSecret())) {
+        if (! $this->enabled) {
             $this->buildPendingSetupData();
         }
     }
 
-    public function prepare(): void
+    public function prepare()
     {
-        $user = $this->resolveSetupUser();
+        $user = $this->resolveAuthorizedUser();
 
-        if (! is_object($user) || ! app(TwoFactorUser::class)->canStoreTwoFactorSecret($user)) {
+        if (! $user || ! app(TwoFactorUser::class)->canStoreTwoFactorSecret($user)) {
             return;
         }
 
-        $setup = app(PrepareTwoFactorSetup::class)($user, $this->method);
+        $this->recoveryCodesFreshlyGenerated = false;
+
+        try {
+            $setup = app(PrepareTwoFactorSetup::class)($user, $this->method);
+        } catch (PasswordConfirmationException $exception) {
+            return $this->redirectToPasswordConfirmation($exception);
+        }
 
         $this->method = TwoFactorMethod::from($setup['method']);
         $this->secret = $setup['secret'];
@@ -79,9 +99,9 @@ class TwoFactorSetup extends Page
 
     public function enable()
     {
-        $user = $this->resolveSetupUser();
+        $user = $this->resolveAuthorizedUser();
 
-        if (! is_object($user)) {
+        if (! $user) {
             return;
         }
 
@@ -89,59 +109,73 @@ class TwoFactorSetup extends Page
 
         $data = $this->validate(EnableTwoFactor::rules());
 
-        $this->recoveryCodes = app(EnableTwoFactor::class)($user, $data);
+        try {
+            $this->recoveryCodes = app(EnableTwoFactor::class)($user, $data);
+        } catch (PasswordConfirmationException $exception) {
+            return $this->redirectToPasswordConfirmation($exception);
+        }
+
+        $this->recoveryCodesFreshlyGenerated = true;
         $this->recoveryCodesCount = count($this->recoveryCodes);
 
-        $this->secret = null;
-        $this->uri = null;
-        $this->qrSvg = null;
-        $this->code = '';
+        $this->resetPendingSetupFields();
         $this->method = Guardian::getTwoFactorMethod();
 
         $this->syncState();
 
-        if ($wasPendingSetup) {
-            return app(Guardian::getLoginFeature()->getResponse());
+        $this->awaitingContinueAfterSetup = $wasPendingSetup;
+    }
+
+    public function continueAfterSetup()
+    {
+        if (! $this->awaitingContinueAfterSetup) {
+            return;
         }
 
-        return app(Guardian::getTwoFactorSetupFeature()->getResponse());
+        return $this->redirectForRequiredEmailVerification() ?? app(Guardian::getLoginFeature()->getResponse());
     }
 
     public function disable()
     {
-        $user = $this->resolveSetupUser();
+        $user = $this->resolveAuthorizedUser();
 
-        if (! is_object($user)) {
+        if (! $user) {
             return;
         }
 
-        app(DisableTwoFactor::class)($user);
+        try {
+            app(DisableTwoFactor::class)($user);
+        } catch (PasswordConfirmationException $exception) {
+            return $this->redirectToPasswordConfirmation($exception);
+        }
 
-        $this->secret = null;
-        $this->uri = null;
-        $this->qrSvg = null;
-        $this->code = '';
+        $this->resetPendingSetupFields();
+        $this->awaitingContinueAfterSetup = false;
 
         $this->syncState();
-
-        return app(Guardian::getTwoFactorSetupFeature()->getResponse());
     }
 
-    public function regenerateRecoveryCodes(): void
+    public function regenerateRecoveryCodes()
     {
-        $user = $this->resolveSetupUser();
+        $user = $this->resolveAuthorizedUser();
 
-        if (! is_object($user)) {
+        if (! $user) {
             return;
         }
 
-        $this->recoveryCodes = app(RegenerateTwoFactorRecoveryCodes::class)($user);
+        try {
+            $this->recoveryCodes = app(RegenerateTwoFactorRecoveryCodes::class)($user);
+        } catch (PasswordConfirmationException $exception) {
+            return $this->redirectToPasswordConfirmation($exception);
+        }
+
+        $this->recoveryCodesFreshlyGenerated = true;
         $this->recoveryCodesCount = count($this->recoveryCodes);
     }
 
     public function revokeTrustedDevice(int $deviceId): void
     {
-        $user = Guardian::user();
+        $user = $this->resolveAuthorizedUser(requireAuthenticated: true);
 
         if (! $user instanceof Model) {
             return;
@@ -154,7 +188,7 @@ class TwoFactorSetup extends Page
 
     public function revokeAllTrustedDevices(): void
     {
-        $user = Guardian::user();
+        $user = $this->resolveAuthorizedUser(requireAuthenticated: true);
 
         if (! $user instanceof Model) {
             return;
@@ -173,23 +207,27 @@ class TwoFactorSetup extends Page
 
         if (! is_object($user)) {
             $this->enabled = false;
-            $this->recoveryCodes = [];
-            $this->recoveryCodesCount = 0;
-            $this->canManageRecoveryCodes = false;
-            $this->trustedDevices = [];
+            $this->resetTwoFactorRecoveryState();
 
             return;
         }
 
         $fortress = Guardian::getCurrentOrDefaultFortress();
 
-        $this->enabled = $manager->hasTwoFactorEnabled($user, $fortress);
+        $this->secretUnreadable = false;
+
+        try {
+            $this->enabled = $manager->hasTwoFactorEnabled($user, $fortress);
+        } catch (TwoFactorSecretDecryptionException) {
+            $this->enabled = true;
+            $this->secretUnreadable = true;
+            $this->resetTwoFactorRecoveryState();
+
+            return;
+        }
 
         if (! $this->enabled) {
-            $this->recoveryCodes = [];
-            $this->recoveryCodesCount = 0;
-            $this->canManageRecoveryCodes = false;
-            $this->trustedDevices = [];
+            $this->resetTwoFactorRecoveryState();
 
             return;
         }
@@ -197,14 +235,26 @@ class TwoFactorSetup extends Page
         $this->canManageRecoveryCodes = $manager->canStoreTwoFactorRecoveryCodes($user);
 
         if ($this->canManageRecoveryCodes) {
-            $this->recoveryCodes = array_values(array_filter(
-                $manager->getTwoFactorRecoveryCodes($user, $fortress),
-                fn ($code) => is_string($code) && filled($code),
-            ));
+            if (! $this->recoveryCodesFreshlyGenerated) {
+                $this->recoveryCodes = array_values(array_filter(
+                    $manager->getTwoFactorRecoveryCodes($user, $fortress),
+                    fn ($code) => is_string($code) && filled($code),
+                ));
+            }
+
             $this->recoveryCodesCount = $manager->getTwoFactorRecoveryCodesCount($user, $fortress);
         }
 
         $this->syncTrustedDevices();
+    }
+
+    protected function resetTwoFactorRecoveryState(): void
+    {
+        $this->recoveryCodes = [];
+        $this->recoveryCodesCount = 0;
+        $this->canManageRecoveryCodes = false;
+        $this->trustedDevices = [];
+        $this->recoveryCodesFreshlyGenerated = false;
     }
 
     protected function syncTrustedDevices(): void
@@ -223,12 +273,14 @@ class TwoFactorSetup extends Page
     protected function buildPendingSetupData(): void
     {
         $user = $this->resolveSetupUser();
-        $secret = Guardian::getTwoFactorSetupSecret();
-        $method = Guardian::getTwoFactorSetupMethod();
+        $session = Guardian::getTwoFactorSetupSession();
+        $secret = $session['secret'] ?? null;
 
         if (! is_object($user) || ! is_string($secret) || blank($secret)) {
             return;
         }
+
+        $method = TwoFactorMethod::tryFrom((string) ($session['method'] ?? '')) ?? Guardian::getTwoFactorMethod();
 
         $this->method = $method;
 
@@ -240,27 +292,24 @@ class TwoFactorSetup extends Page
             return;
         }
 
-        $account = 'user';
-
-        if (method_exists($user, 'getAuthIdentifier')) {
-            $identifier = $user->getAuthIdentifier();
-
-            if (is_scalar($identifier) && filled((string) $identifier)) {
-                $account = (string) $identifier;
-            }
-        }
-
-        if (method_exists($user, 'getEmailForVerification')) {
-            $email = $user->getEmailForVerification();
-
-            if (is_string($email) && filled($email)) {
-                $account = $email;
-            }
-        }
+        $account = app(Totp::class)->resolveAccountLabel($user);
 
         $this->secret = $secret;
         $this->uri = app(Totp::class)->makeOtpAuthUri($secret, $account);
         $this->qrSvg = app(QrCode::class)->svg($this->uri);
+    }
+
+    protected function redirectToPasswordConfirmation(PasswordConfirmationException $exception)
+    {
+        $url = Guardian::passwordConfirmationUrl();
+
+        if (! $url) {
+            throw $exception;
+        }
+
+        Session::put('url.intended', Guardian::getTwoFactorSetupFeature()->getUrl());
+
+        return Redirector::redirect($url);
     }
 
     protected function resolveSetupUser(): ?object
@@ -274,5 +323,30 @@ class TwoFactorSetup extends Page
         $pendingUser = Guardian::getPendingTwoFactorSetupUser();
 
         return is_object($pendingUser) ? $pendingUser : null;
+    }
+
+    protected function resolveAuthorizedUser(bool $requireAuthenticated = false): ?object
+    {
+        $user = $requireAuthenticated ? Guardian::user() : $this->resolveSetupUser();
+
+        if ($requireAuthenticated && ! $user instanceof Model) {
+            return null;
+        }
+
+        if (! $user) {
+            return null;
+        }
+
+        $this->abortIfCannotAccessTwoFactorSetup($user);
+
+        return $user;
+    }
+
+    protected function resetPendingSetupFields(): void
+    {
+        $this->secret = null;
+        $this->uri = null;
+        $this->qrSvg = null;
+        $this->code = '';
     }
 }

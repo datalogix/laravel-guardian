@@ -6,7 +6,7 @@ use Datalogix\Guardian\Events\TwoFactorTrustedDeviceRemembered;
 use Datalogix\Guardian\Events\TwoFactorTrustedDeviceRevoked;
 use Datalogix\Guardian\Events\TwoFactorTrustedDevicesRevokedAll;
 use Datalogix\Guardian\Fortress;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Cookie;
 
 class TwoFactorTrustedDeviceManager
@@ -18,7 +18,7 @@ class TwoFactorTrustedDeviceManager
 
     public function remember(
         Fortress $fortress,
-        Model $user,
+        Authenticatable $user,
         bool $enabled,
         int $days,
         string $cookieName,
@@ -45,7 +45,7 @@ class TwoFactorTrustedDeviceManager
             $days * 1440,
             null,
             null,
-            request()->isSecure(),
+            $this->resolveSecureCookieFlag(),
             true,
             false,
             'lax',
@@ -59,15 +59,19 @@ class TwoFactorTrustedDeviceManager
         Cookie::queue(Cookie::forget($cookieName));
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function list(Fortress $fortress, Model $user): array
+    protected function resolveSecureCookieFlag(): bool
+    {
+        $secure = config('session.secure');
+
+        return is_bool($secure) ? $secure : request()->isSecure();
+    }
+
+    public function list(Fortress $fortress, Authenticatable $user): array
     {
         return $this->trustedDevices->list($fortress, $user);
     }
 
-    public function revoke(Fortress $fortress, Model $user, int $deviceId): bool
+    public function revoke(Fortress $fortress, Authenticatable $user, int $deviceId): bool
     {
         $revoked = $this->trustedDevices->revoke($deviceId, $fortress, $user);
 
@@ -78,7 +82,7 @@ class TwoFactorTrustedDeviceManager
         return $revoked;
     }
 
-    public function revokeAll(Fortress $fortress, Model $user): int
+    public function revokeAll(Fortress $fortress, Authenticatable $user): int
     {
         $count = $this->trustedDevices->revokeAll($fortress, $user);
 
@@ -91,7 +95,7 @@ class TwoFactorTrustedDeviceManager
 
     public function shouldSkipChallenge(
         Fortress $fortress,
-        Model $user,
+        Authenticatable $user,
         bool $enabled,
         string $cookieName,
     ): bool {

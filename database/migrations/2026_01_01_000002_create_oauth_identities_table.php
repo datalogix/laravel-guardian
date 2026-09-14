@@ -12,12 +12,25 @@ return new class extends Migration
     public function up(): void
     {
         if (Schema::hasTable('oauth_identities')) {
+            $expected = [
+                'fortress_id', 'auth_guard', 'authenticatable_type', 'authenticatable_id',
+                'provider', 'provider_user_id', 'email', 'name', 'avatar',
+                'access_token', 'refresh_token', 'token_expires_at', 'last_used_at',
+            ];
+
+            if (! Schema::hasColumns('oauth_identities', $expected)) {
+                throw new RuntimeException(
+                    'An [oauth_identities] table already exists but is missing columns Guardian expects. '.
+                    'Rename or drop the pre-existing table so this migration can create its own.'
+                );
+            }
+
             return;
         }
 
         Schema::create('oauth_identities', function (Blueprint $table) {
             $table->id();
-            $table->string('fortress_id', 20)->index();
+            $table->string('fortress_id', 20);
             $table->string('auth_guard', 20)->nullable()->index();
             $table->morphs('authenticatable', 'guardian_oauth_authenticatable_idx');
             $table->string('provider', 20)->index();

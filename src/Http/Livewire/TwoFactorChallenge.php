@@ -30,9 +30,9 @@ class TwoFactorChallenge extends Page
     {
         $data = $this->validate(ConfirmTwoFactorChallengeAction::rules());
 
-        app(ConfirmTwoFactorChallengeAction::class)($data);
+        $result = app(ConfirmTwoFactorChallengeAction::class)($data);
 
-        return app(Guardian::getLoginFeature()->getResponse());
+        return Guardian::respondToAuthFlow($result, Guardian::getLoginFeature()->getResponse());
     }
 
     public function resend(): void

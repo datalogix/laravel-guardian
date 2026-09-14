@@ -3,7 +3,9 @@
 namespace Datalogix\Guardian\Concerns;
 
 use Closure;
+use Datalogix\Guardian\Enums\IdentifierKey;
 use Datalogix\Guardian\Enums\Layout;
+use Datalogix\Guardian\Exceptions\IdentifierValueMissingException;
 use Datalogix\Guardian\Features\ForgotPasswordFeature;
 use Datalogix\Guardian\Features\ResetPasswordFeature;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -77,22 +79,33 @@ trait HasPasswordReset
         return URL::signedRoute(
             $this->generateRouteName($this->getResetPasswordFeature()->getRouteName()),
             [
-                'email' => $user->getEmailForPasswordReset(),
+                'login' => $this->resolveResetPasswordIdentifierValue($user),
                 'token' => $token,
                 ...$parameters,
             ],
         );
     }
 
-    public function passwordResetRoutes(): static
+    protected function resolveResetPasswordIdentifierValue(CanResetPassword|Model|Authenticatable $user): string
     {
-        if ($this->getForgotPasswordFeature()->hasFeature()) {
-            $this->getForgotPasswordFeature()->registerRoutes();
+        $identifierKey = $this->getIdentifierKey();
+
+        $value = match ($identifierKey) {
+            IdentifierKey::Email => $user->getEmailForPasswordReset(),
+            default => data_get($user, $identifierKey->value),
+        };
+
+        if (blank($value)) {
+            throw IdentifierValueMissingException::forUser($identifierKey->value, $user->getAuthIdentifier());
         }
 
-        if ($this->getResetPasswordFeature()->hasFeature()) {
-            $this->getResetPasswordFeature()->registerRoutes();
-        }
+        return $value;
+    }
+
+    public function passwordResetRoutes(): static
+    {
+        $this->getForgotPasswordFeature()->registerRoutesIfEnabled();
+        $this->getResetPasswordFeature()->registerRoutesIfEnabled();
 
         return $this;
     }

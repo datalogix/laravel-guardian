@@ -1,10 +1,10 @@
 <?php
 
-namespace Datalogix\Guardian\Support\TwoFactor;
+namespace Datalogix\Guardian\Support;
 
 use Illuminate\Support\Facades\Session;
 
-class TwoFactorSessionState
+class SessionState
 {
     public function put(string $key, array $state): void
     {
@@ -35,9 +35,9 @@ class TwoFactorSessionState
         return $state;
     }
 
-    public function update(string $key, callable $mutator): ?array
+    public function update(string $key, callable $mutator, int|false|null $ttl = null): ?array
     {
-        $state = $this->get($key);
+        $state = $this->getValid($key, $ttl);
 
         if (! $state) {
             return null;

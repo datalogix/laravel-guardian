@@ -3,26 +3,33 @@
 namespace Datalogix\Guardian\Support\OAuth;
 
 use Laravel\Socialite\Contracts\User as ProviderUser;
+use Laravel\Socialite\One\User as OAuthOneUser;
+use Laravel\Socialite\Two\User as OAuthTwoUser;
 
 class OAuthTokenPayload
 {
-    /**
-     * @return array{access_token: ?string, refresh_token: ?string, token_expires_at: ?\DateTimeInterface}
-     */
     public function fromProviderUser(ProviderUser $oauthUser): array
     {
-        $meta = get_object_vars($oauthUser);
+        if ($oauthUser instanceof OAuthTwoUser) {
+            return [
+                'access_token' => is_string($oauthUser->token) ? $oauthUser->token : null,
+                'refresh_token' => is_string($oauthUser->refreshToken) ? $oauthUser->refreshToken : null,
+                'token_expires_at' => is_int($oauthUser->expiresIn) ? now()->addSeconds($oauthUser->expiresIn) : null,
+            ];
+        }
 
-        $accessToken = is_string($meta['token'] ?? null) ? $meta['token'] : null;
-        $refreshToken = is_string($meta['refreshToken'] ?? null) ? $meta['refreshToken'] : null;
-        $tokenExpiresAt = is_int($meta['expiresIn'] ?? null)
-            ? now()->addSeconds($meta['expiresIn'])
-            : null;
+        if ($oauthUser instanceof OAuthOneUser) {
+            return [
+                'access_token' => is_string($oauthUser->token) ? $oauthUser->token : null,
+                'refresh_token' => null,
+                'token_expires_at' => null,
+            ];
+        }
 
         return [
-            'access_token' => $accessToken,
-            'refresh_token' => $refreshToken,
-            'token_expires_at' => $tokenExpiresAt,
+            'access_token' => null,
+            'refresh_token' => null,
+            'token_expires_at' => null,
         ];
     }
 }

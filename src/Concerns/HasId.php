@@ -2,16 +2,22 @@
 
 namespace Datalogix\Guardian\Concerns;
 
-use Exception;
+use Datalogix\Guardian\Exceptions\FortressIdException;
 
 trait HasId
 {
+    public const MAX_ID_LENGTH = 20;
+
     protected string $id;
 
     public function id(string $id): static
     {
         if (isset($this->id)) {
-            throw new Exception("The fortress has already been registered with the ID [{$this->id}].");
+            throw FortressIdException::alreadyRegistered($this->id);
+        }
+
+        if (strlen($id) > static::MAX_ID_LENGTH) {
+            throw FortressIdException::tooLong($id, static::MAX_ID_LENGTH);
         }
 
         $this->id = $id;
@@ -23,7 +29,7 @@ trait HasId
     public function getId(): string
     {
         if (! isset($this->id)) {
-            throw new Exception('A fortress has been registered without an `id()`.');
+            throw FortressIdException::missing();
         }
 
         return $this->id;

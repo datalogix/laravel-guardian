@@ -31,9 +31,6 @@ class TwoFactorLifecycleManager
         Guardian::forgetRememberedTwoFactorDevice();
     }
 
-    /**
-     * @return array<int, string>
-     */
     public function regenerateRecoveryCodes(object $user): array
     {
         if (! $this->twoFactorUser->canStoreTwoFactorRecoveryCodes($user)) {

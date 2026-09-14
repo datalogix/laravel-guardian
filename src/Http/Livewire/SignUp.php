@@ -16,7 +16,7 @@ class SignUp extends Page
 
     public string $email = '';
 
-    public string $username = '';
+    public string $login = '';
 
     public string $password = '';
 
@@ -33,8 +33,8 @@ class SignUp extends Page
     {
         $data = $this->validate(SignUpAction::rules());
 
-        app(SignUpAction::class)($data);
+        $result = app(SignUpAction::class)($data);
 
-        return app(Guardian::getSignUpFeature()->getResponse());
+        return Guardian::respondToAuthFlow($result, Guardian::getSignUpFeature()->getResponse());
     }
 }

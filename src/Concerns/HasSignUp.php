@@ -37,9 +37,7 @@ trait HasSignUp
 
     public function signUpRoutes(): static
     {
-        if ($this->getSignUpFeature()->hasFeature()) {
-            $this->getSignUpFeature()->registerRoutes();
-        }
+        $this->getSignUpFeature()->registerRoutesIfEnabled();
 
         return $this;
     }

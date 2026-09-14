@@ -20,14 +20,14 @@ trait HasModes
             ->authMiddleware([Authenticate::class]);
     }
 
-    public function admin(): static
+    public function admin(string $id = 'admin'): static
     {
-        return $this->basic()->path('admin');
+        return $this->basic($id)->path('admin');
     }
 
-    public function product(): static
+    public function product(string $id = 'product'): static
     {
-        return $this->basic()
+        return $this->basic($id)
             ->signUp()
             ->emailVerification();
     }

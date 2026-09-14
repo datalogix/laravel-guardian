@@ -6,6 +6,9 @@ use Closure;
 use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Framework\FrameworkResolver;
+use Illuminate\Routing\Route as RouteInstance;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
 abstract class Feature
@@ -38,7 +41,7 @@ abstract class Feature
         $this->routeAction = $routeAction ?? $this->defaultRouteAction();
         $this->routeSlug = $routeSlug ?? $this->defaultRouteSlug();
         $this->routeName = $routeName ?? $this->defaultRouteName();
-        $this->response = value($response) ?? value($this->defaultResponse());
+        $this->response = $response ?? $this->defaultResponse();
         $this->maxAttempts = $maxAttempts ?? $this->defaultMaxAttempts();
 
         if ($layout) {
@@ -81,7 +84,7 @@ abstract class Feature
 
     public function hasFeature(): bool
     {
-        return filled($this->routeAction);
+        return $this->routeAction !== false && filled($this->routeAction);
     }
 
     public function getUrl(array $parameters = []): ?string
@@ -92,6 +95,25 @@ abstract class Feature
     }
 
     abstract public function registerRoutes(): void;
+
+    public function registerRoutesIfEnabled(): void
+    {
+        if ($this->hasFeature()) {
+            $this->registerRoutes();
+        }
+    }
+
+    protected function registerRoute(string $method, string $path, array|string $middleware = []): RouteInstance
+    {
+        return Route::{$method}($path, $this->getRouteAction())
+            ->middleware(array_filter(Arr::wrap($middleware)))
+            ->name($this->getRouteName());
+    }
+
+    protected function throttleMiddleware(): ?string
+    {
+        return $this->getMaxAttempts() ? 'throttle:'.$this->getMaxAttempts().',1' : null;
+    }
 
     abstract protected function defaultRouteAction();
 

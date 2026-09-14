@@ -2,6 +2,7 @@
 
 namespace Datalogix\Guardian\Support\TwoFactor;
 
+use Datalogix\Guardian\Enums\TwoFactorMethod;
 use Datalogix\Guardian\Events\TwoFactorEnabled;
 use Datalogix\Guardian\Exceptions\TwoFactorSetupException;
 use Datalogix\Guardian\Guardian;
@@ -10,24 +11,24 @@ use Illuminate\Database\Eloquent\Model;
 class TwoFactorSetupManager
 {
     public function __construct(
-        protected TwoFactorTotpVerifier $totpVerifier,
         protected TwoFactorUser $twoFactorUser,
         protected RecoveryCodes $recoveryCodes,
+        protected Totp $totp,
     ) {}
 
-    /**
-     * @return array<int, string>
-     */
     public function enableFromPendingSetup(object $user, string $code): array
     {
-        $pendingSecret = Guardian::getTwoFactorSetupSecret();
-        $method = Guardian::getTwoFactorSetupMethod();
+        $session = Guardian::getTwoFactorSetupSession();
+        $pendingSecret = $session['secret'] ?? null;
+        $method = TwoFactorMethod::tryFrom((string) ($session['method'] ?? '')) ?? Guardian::getTwoFactorMethod();
 
         if (! is_string($pendingSecret) || blank($pendingSecret)) {
             throw TwoFactorSetupException::missingPendingSecret();
         }
 
-        if (! $this->totpVerifier->verify($pendingSecret, $code)) {
+        $window = $this->totp->windowFor($method, Guardian::getTwoFactorSetupTtl());
+
+        if (! $this->totp->verify($pendingSecret, $code, $window)) {
             throw TwoFactorSetupException::invalidCode();
         }
 
@@ -37,7 +38,7 @@ class TwoFactorSetupManager
         if (! $this->twoFactorUser->canStoreTwoFactorSecret($user) || ! $this->twoFactorUser->saveTwoFactorSecret($user, $fortress, $storedSecret)) {
             Guardian::clearTwoFactorSetup();
 
-            return [];
+            throw TwoFactorSetupException::unableToStoreSecret();
         }
 
         $recoveryCodes = [];

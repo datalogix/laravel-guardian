@@ -3,7 +3,6 @@
 namespace Datalogix\Guardian\Features;
 
 use Datalogix\Guardian\Http\Responses\EmailVerificationPromptResponse;
-use Illuminate\Support\Facades\Route;
 
 class EmailVerificationPromptFeature extends Feature
 {
@@ -39,8 +38,6 @@ class EmailVerificationPromptFeature extends Feature
 
     public function registerRoutes(): void
     {
-        Route::get($this->getRouteSlug(), $this->getRouteAction())
-            ->middleware($this->fortress->getAuthMiddleware())
-            ->name($this->getRouteName());
+        $this->registerRoute('get', $this->getRouteSlug(), $this->fortress->getAuthMiddleware());
     }
 }

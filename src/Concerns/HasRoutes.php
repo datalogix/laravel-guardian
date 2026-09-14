@@ -72,11 +72,11 @@ trait HasRoutes
 
     public function generateRouteName(string $name = '', ?string $domain = null): string
     {
-        if ($this->getId() === 'default') {
-            return $name;
-        }
-
         $domain = $this->resolveDomainForRouteName($domain);
+
+        if ($this->isDefault()) {
+            return "{$domain}{$name}";
+        }
 
         return "guardian.{$this->getId()}.{$domain}{$name}";
     }

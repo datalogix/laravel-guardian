@@ -19,7 +19,9 @@ class Authenticate extends BaseAuthenticate
 
         $this->auth->shouldUse(Guardian::getGuard());
 
-        if (Guardian::cannotAccess($auth->user())) {
+        $user = $auth->user();
+
+        if (Guardian::cannotAccess($user)) {
             abort(403);
         }
     }

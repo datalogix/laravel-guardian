@@ -4,15 +4,16 @@ namespace Datalogix\Guardian\Support\TwoFactor;
 
 use Datalogix\Guardian\Enums\TwoFactorMethod;
 use Datalogix\Guardian\Fortress;
-use Illuminate\Database\Eloquent\Model;
+use Datalogix\Guardian\Support\SessionState;
+use Illuminate\Contracts\Auth\Authenticatable;
 
 class TwoFactorSessionManager
 {
     public function __construct(
-        protected TwoFactorSessionState $state,
+        protected SessionState $state,
     ) {}
 
-    public function startChallenge(Fortress $fortress, Model $user, bool $remember, TwoFactorMethod $method): void
+    public function startChallenge(Fortress $fortress, Authenticatable $user, bool $remember, TwoFactorMethod $method): void
     {
         $this->state->put($fortress->getTwoFactorChallengeSessionKey(), [
             'user_id' => $user->getAuthIdentifier(),
@@ -36,7 +37,7 @@ class TwoFactorSessionManager
 
     public function updateChallenge(Fortress $fortress, callable $mutator): ?array
     {
-        return $this->state->update($fortress->getTwoFactorChallengeSessionKey(), $mutator);
+        return $this->state->update($fortress->getTwoFactorChallengeSessionKey(), $mutator, $fortress->getTwoFactorChallengeTtl());
     }
 
     public function startSetup(Fortress $fortress, string $secret, TwoFactorMethod $method): void
@@ -58,7 +59,7 @@ class TwoFactorSessionManager
         $this->state->forget($fortress->getTwoFactorSetupSessionKey());
     }
 
-    public function startPendingSetup(Fortress $fortress, Model $user, bool $remember, TwoFactorMethod $method): void
+    public function startPendingSetup(Fortress $fortress, Authenticatable $user, bool $remember, TwoFactorMethod $method): void
     {
         $this->state->put($fortress->getPendingTwoFactorSetupSessionKey(), [
             'user_id' => $user->getAuthIdentifier(),

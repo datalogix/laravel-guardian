@@ -2,40 +2,32 @@
 
 namespace Datalogix\Guardian\Actions;
 
+use Datalogix\Guardian\Actions\Concerns\ResolvesOAuthProvider;
 use Datalogix\Guardian\Exceptions\OAuthException;
 use Datalogix\Guardian\Guardian;
-use Laravel\Socialite\Contracts\Provider;
-use Laravel\Socialite\Facades\Socialite;
+use Datalogix\Guardian\Support\OAuth\SocialiteDriverResolver;
 use Throwable;
 
 class OAuthRedirect
 {
+    use ResolvesOAuthProvider;
+
+    public function __construct(
+        protected SocialiteDriverResolver $driverResolver,
+    ) {}
+
     public function __invoke(string $provider)
     {
-        $provider = Guardian::normalizeOAuthProvider($provider);
-
-        if (! Guardian::hasOAuthProvider($provider)) {
-            throw OAuthException::providerNotEnabled();
-        }
+        $provider = $this->resolveEnabledOAuthProvider($provider);
 
         try {
             $callbackUrl = Guardian::getOAuthFeature()->getCallbackUrl($provider);
-            config(["services.{$provider}.redirect" => $callbackUrl]);
 
-            return $this->driver($provider)->redirect();
-        } catch (Throwable) {
+            return $this->driverResolver->resolve($provider, $callbackUrl)->redirect();
+        } catch (Throwable $exception) {
+            report($exception);
+
             throw OAuthException::unableToRedirect();
         }
-    }
-
-    protected function driver(string $provider): Provider
-    {
-        $driver = Socialite::driver($provider);
-
-        if (Guardian::isOAuthStateless() && method_exists($driver, 'stateless')) {
-            $driver = $driver->stateless();
-        }
-
-        return $driver;
     }
 }
