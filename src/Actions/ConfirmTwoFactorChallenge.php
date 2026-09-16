@@ -23,7 +23,9 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
     public function __construct(
         protected TwoFactorChallengeVerifier $challengeVerifier,
         protected PostAuthenticationFlow $postAuthenticationFlow,
-    ) {}
+    ) {
+        //
+    }
 
     public function __invoke(array $data = []): AuthFlowResult
     {

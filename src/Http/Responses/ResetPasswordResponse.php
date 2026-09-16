@@ -10,7 +10,9 @@ class ResetPasswordResponse implements Responsable
 {
     public function __construct(
         protected string $status
-    ) {}
+    ) {
+        //
+    }
 
     public function toResponse($request)
     {

@@ -12,7 +12,9 @@ class TwoFactorLifecycleManager
     public function __construct(
         protected TwoFactorUser $twoFactorUser,
         protected RecoveryCodes $recoveryCodes,
-    ) {}
+    ) {
+        //
+    }
 
     public function disable(object $user): void
     {

@@ -11,7 +11,9 @@ class TwoFactorSessionManager
 {
     public function __construct(
         protected SessionState $state,
-    ) {}
+    ) {
+        //
+    }
 
     public function startChallenge(Fortress $fortress, Authenticatable $user, bool $remember, TwoFactorMethod $method): void
     {

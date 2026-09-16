@@ -10,7 +10,10 @@ use Symfony\Component\HttpFoundation\Response;
 
 abstract class EnsurePendingAuthStepAccess
 {
-    public function __construct(protected PendingAuthStep $step) {}
+    public function __construct(protected PendingAuthStep $step)
+    {
+        //
+    }
 
     public function handle(Request $request, Closure $next): Response
     {

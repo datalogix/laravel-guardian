@@ -22,7 +22,9 @@ class Login implements HasValidationRules
 
     public function __construct(
         protected PostAuthenticationFlow $postAuthenticationFlow,
-    ) {}
+    ) {
+        //
+    }
 
     public function __invoke(array $data = [], bool $remember = true): AuthFlowResult
     {

@@ -14,5 +14,7 @@ class TwoFactorTrustedDeviceRevoked
         public readonly Fortress $fortress,
         public readonly Model $user,
         public readonly ?int $deviceId = null,
-    ) {}
+    ) {
+        //
+    }
 }

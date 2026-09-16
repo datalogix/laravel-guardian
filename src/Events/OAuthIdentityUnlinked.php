@@ -14,5 +14,7 @@ class OAuthIdentityUnlinked
         public readonly Fortress $fortress,
         public readonly Model $user,
         public readonly string $provider,
-    ) {}
+    ) {
+        //
+    }
 }

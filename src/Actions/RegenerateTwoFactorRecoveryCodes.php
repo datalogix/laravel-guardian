@@ -14,7 +14,9 @@ class RegenerateTwoFactorRecoveryCodes
 
     public function __construct(
         protected TwoFactorLifecycleManager $lifecycleManager,
-    ) {}
+    ) {
+        //
+    }
 
     public function __invoke(object $user): array
     {

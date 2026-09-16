@@ -9,7 +9,9 @@ class EmailVerificationPromptResponse implements Responsable
 {
     public function __construct(
         protected $sent
-    ) {}
+    ) {
+        //
+    }
 
     public function toResponse($request)
     {

@@ -14,5 +14,7 @@ class TwoFactorChallengeFailed
         public readonly Fortress $fortress,
         public readonly ?Model $user = null,
         public readonly string $reason = 'invalid',
-    ) {}
+    ) {
+        //
+    }
 }

@@ -11,5 +11,7 @@ class FortressBootStarting
 
     public function __construct(
         public readonly Fortress $fortress,
-    ) {}
+    ) {
+        //
+    }
 }

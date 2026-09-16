@@ -26,7 +26,9 @@ class CompleteOAuthRegistration implements HasValidationRules
     public function __construct(
         protected PostAuthenticationFlow $postAuthenticationFlow,
         protected OAuthIdentities $oauthIdentities,
-    ) {}
+    ) {
+        //
+    }
 
     public function __invoke(array $data = [], bool $remember = true): AuthFlowResult
     {

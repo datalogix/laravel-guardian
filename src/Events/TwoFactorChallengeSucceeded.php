@@ -14,5 +14,7 @@ class TwoFactorChallengeSucceeded
         public readonly Fortress $fortress,
         public readonly Model $user,
         public readonly bool $usedRecoveryCode = false,
-    ) {}
+    ) {
+        //
+    }
 }

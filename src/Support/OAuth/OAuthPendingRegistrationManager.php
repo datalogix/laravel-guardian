@@ -9,7 +9,9 @@ class OAuthPendingRegistrationManager
 {
     public function __construct(
         protected SessionState $state,
-    ) {}
+    ) {
+        //
+    }
 
     public function start(
         Fortress $fortress,

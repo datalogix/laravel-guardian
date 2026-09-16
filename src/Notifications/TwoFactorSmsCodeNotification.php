@@ -15,7 +15,9 @@ class TwoFactorSmsCodeNotification extends Notification implements ShouldQueue
     public function __construct(
         protected string $code,
         protected string $context,
-    ) {}
+    ) {
+        //
+    }
 
     public function via(object $notifiable): array
     {

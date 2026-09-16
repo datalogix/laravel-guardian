@@ -14,7 +14,9 @@ class DisableTwoFactor
 
     public function __construct(
         protected TwoFactorLifecycleManager $lifecycleManager,
-    ) {}
+    ) {
+        //
+    }
 
     public function __invoke(object $user): void
     {

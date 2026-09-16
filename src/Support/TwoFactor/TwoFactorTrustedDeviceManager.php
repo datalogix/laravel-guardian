@@ -14,7 +14,9 @@ class TwoFactorTrustedDeviceManager
     public function __construct(
         protected TwoFactorUser $twoFactorUser,
         protected TrustedDevices $trustedDevices,
-    ) {}
+    ) {
+        //
+    }
 
     public function remember(
         Fortress $fortress,

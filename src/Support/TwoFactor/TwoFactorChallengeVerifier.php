@@ -11,7 +11,9 @@ class TwoFactorChallengeVerifier
     public function __construct(
         protected TwoFactorUser $twoFactorUser,
         protected Totp $totp,
-    ) {}
+    ) {
+        //
+    }
 
     public function verify(Model $user, Fortress $fortress, string $code): TwoFactorChallengeVerificationResult
     {

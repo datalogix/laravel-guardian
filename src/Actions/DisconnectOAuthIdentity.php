@@ -18,7 +18,9 @@ class DisconnectOAuthIdentity
 
     public function __construct(
         protected OAuthIdentities $oauthIdentities,
-    ) {}
+    ) {
+        //
+    }
 
     public function __invoke(Model $user, string $provider): bool
     {

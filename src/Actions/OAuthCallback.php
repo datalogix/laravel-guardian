@@ -35,7 +35,9 @@ class OAuthCallback
         protected OAuthIdentities $oauthIdentities,
         protected OAuthTokenPayload $oauthTokenPayload,
         protected SocialiteDriverResolver $driverResolver,
-    ) {}
+    ) {
+        //
+    }
 
     public function __invoke(string $provider, bool $remember = true): AuthFlowResult
     {

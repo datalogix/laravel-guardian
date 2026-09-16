@@ -14,7 +14,9 @@ class TwoFactorSetupManager
         protected TwoFactorUser $twoFactorUser,
         protected RecoveryCodes $recoveryCodes,
         protected Totp $totp,
-    ) {}
+    ) {
+        //
+    }
 
     public function enableFromPendingSetup(object $user, string $code): array
     {

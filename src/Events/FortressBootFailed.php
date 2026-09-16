@@ -13,5 +13,7 @@ class FortressBootFailed
     public function __construct(
         public readonly Fortress $fortress,
         public readonly Throwable $exception,
-    ) {}
+    ) {
+        //
+    }
 }
