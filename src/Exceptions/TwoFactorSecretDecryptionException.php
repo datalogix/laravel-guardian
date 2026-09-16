@@ -2,4 +2,7 @@
 
 namespace Datalogix\Guardian\Exceptions;
 
-class TwoFactorSecretDecryptionException extends GuardianException {}
+class TwoFactorSecretDecryptionException extends GuardianException
+{
+    //
+}
