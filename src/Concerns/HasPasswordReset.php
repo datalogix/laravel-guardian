@@ -2,9 +2,9 @@
 
 namespace Datalogix\Guardian\Concerns;
 
+use BackedEnum;
 use Closure;
 use Datalogix\Guardian\Enums\IdentifierKey;
-use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Exceptions\IdentifierValueMissingException;
 use Datalogix\Guardian\Features\ForgotPasswordFeature;
 use Datalogix\Guardian\Features\ResetPasswordFeature;
@@ -20,6 +20,8 @@ trait HasPasswordReset
     protected ?ResetPasswordFeature $resetPasswordFeature = null;
 
     protected ?string $passwordBroker = null;
+
+    protected bool $revealsAccounts = false;
 
     public function getForgotPasswordFeature(): ForgotPasswordFeature
     {
@@ -37,14 +39,15 @@ trait HasPasswordReset
         ?string $forgotPasswordRouteName = null,
         string|Closure|null $forgotPasswordResponse = null,
         int|false|null $forgotPasswordMaxAttempts = null,
-        Layout|string|null $forgotPasswordLayout = null,
+        BackedEnum|string|null $forgotPasswordLayout = null,
         string|Closure|array|false|null $resetPasswordRouteAction = null,
         ?string $resetPasswordRouteSlug = null,
         ?string $resetPasswordRouteName = null,
         string|Closure|null $resetPasswordResponse = null,
         int|false|null $resetPasswordMaxAttempts = null,
-        Layout|string|null $resetPasswordLayout = null,
+        BackedEnum|string|null $resetPasswordLayout = null,
         ?string $passwordBroker = null,
+        bool $revealsAccounts = false,
     ): static {
         $this->getForgotPasswordFeature()->configure(
             $forgotPasswordRouteAction,
@@ -65,6 +68,7 @@ trait HasPasswordReset
         );
 
         $this->passwordBroker = $passwordBroker;
+        $this->revealsAccounts = $revealsAccounts;
 
         return $this;
     }
@@ -72,6 +76,15 @@ trait HasPasswordReset
     public function getPasswordBroker(): ?string
     {
         return $this->passwordBroker;
+    }
+
+    /**
+     * Whether the forgot password form tells the visitor if an account exists
+     * for the login they typed (it does not, by default).
+     */
+    public function passwordResetRevealsAccounts(): bool
+    {
+        return $this->revealsAccounts;
     }
 
     public function getResetPasswordUrl(string $token, CanResetPassword|Model|Authenticatable $user, array $parameters = []): string

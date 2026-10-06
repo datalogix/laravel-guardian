@@ -12,6 +12,7 @@ use Datalogix\Guardian\Exceptions\SignUpException;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\Auth\PostAuthenticationFlow;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -33,7 +34,16 @@ class SignUp implements HasValidationRules
         return $this->throttleAction(
             function () use ($data, $remember) {
                 $modelClass = Guardian::authModelClass();
+                // Only the fields of the form reach the model, whatever the caller passes
+                // along: a model with $guarded = [] would otherwise take any of them.
+                $data = Arr::only($data, array_keys(static::rules()));
                 $attributes = $this->remapLoginField(Arr::except($data, ['password_confirmation', 'terms']));
+
+                // Hashed here, not left to the model: a model without the "hashed"
+                // cast would otherwise store the password as it was typed.
+                if (is_string($attributes['password'] ?? null)) {
+                    $attributes['password'] = Hash::make($attributes['password']);
+                }
 
                 $user = $this->createAuthenticatableUser(
                     $modelClass,

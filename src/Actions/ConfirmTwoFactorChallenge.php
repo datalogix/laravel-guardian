@@ -18,6 +18,13 @@ use Illuminate\Support\Timebox;
 
 class ConfirmTwoFactorChallenge implements HasValidationRules
 {
+    /**
+     * Wrong codes a user may enter in a day, whatever the limit per minute: without
+     * it, whoever has the password could keep guessing at that pace for as long as
+     * they like.
+     */
+    public const DAILY_MAX_ATTEMPTS = 20;
+
     use Concerns\HasRateLimiter;
 
     public function __construct(
@@ -35,24 +42,27 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
             throw TwoFactorChallengeException::notPending();
         }
 
-        $throttleKey = $this->throttleKey((string) ($challenge['user_id'] ?? null), includeIp: false);
+        $fortress = Guardian::getCurrentOrDefaultFortress();
+        $userKey = (string) ($challenge['user_id'] ?? null);
+        $throttleKey = $this->throttleKey($userKey, includeIp: false);
+        $dailyThrottleKey = $this->throttleKey('daily|'.$userKey, includeIp: false);
         $maxAttempts = Guardian::getTwoFactorChallengeFeature()->getMaxAttempts();
+        $dailyMaxAttempts = $this->shouldThrottle($maxAttempts) ? static::DAILY_MAX_ATTEMPTS : false;
 
-        $this->ensureIsNotRateLimited(
-            $throttleKey,
-            $maxAttempts,
-            function (int $seconds) {
-                $user = Guardian::getPendingTwoFactorChallengeUser();
+        $onLockout = function (int $seconds) {
+            $user = Guardian::getPendingTwoFactorChallengeUser();
 
-                event(new TwoFactorChallengeFailed(
-                    Guardian::getCurrentOrDefaultFortress(),
-                    $user instanceof Model ? $user : null,
-                    'rate-limited',
-                ));
+            event(new TwoFactorChallengeFailed(
+                Guardian::getCurrentOrDefaultFortress(),
+                $user instanceof Model ? $user : null,
+                'rate-limited',
+            ));
 
-                throw TwoFactorChallengeException::rateLimited($seconds);
-            }
-        );
+            throw TwoFactorChallengeException::rateLimited($seconds);
+        };
+
+        $this->reserveAttempt($throttleKey, $maxAttempts, $onLockout);
+        $this->reserveAttempt($dailyThrottleKey, $dailyMaxAttempts, $onLockout, 86400);
 
         $rememberDevice = (bool) ($data['remember_device'] ?? false);
         Guardian::setTwoFactorChallengeRememberDevice($rememberDevice);
@@ -66,13 +76,11 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
             throw TwoFactorChallengeException::notPending();
         }
 
-        $fortress = Guardian::getCurrentOrDefaultFortress();
         $code = (string) ($data['code'] ?? '');
         $verification = $this->timeboxedVerify($user, $fortress, $code);
         $usedRecoveryCode = $verification->usedRecoveryCode();
 
         if (! $verification->isValid()) {
-            $this->hitRateLimiterIfThrottled($throttleKey, $maxAttempts);
             event(new TwoFactorChallengeFailed($fortress, $user, 'invalid-code'));
 
             throw TwoFactorChallengeException::invalid();
@@ -83,6 +91,7 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
         }
 
         $this->clearRateLimiterIfThrottled($throttleKey, $maxAttempts);
+        $this->clearRateLimiterIfThrottled($dailyThrottleKey, $dailyMaxAttempts);
 
         if ($rememberDevice) {
             Guardian::rememberTwoFactorOnCurrentDevice($user);

@@ -2,8 +2,8 @@
 
 namespace Datalogix\Guardian\Concerns;
 
+use BackedEnum;
 use Closure;
-use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Enums\OAuthEmailCollisionPolicy;
 use Datalogix\Guardian\Features\OAuthCompleteRegistrationFeature;
 use Datalogix\Guardian\Features\OAuthFeature;
@@ -49,7 +49,7 @@ trait HasOAuth
         ?string $routeName = null,
         string|Closure|null $response = null,
         int|false|null $maxAttempts = null,
-        Layout|string|null $layout = null,
+        BackedEnum|string|null $layout = null,
         ?array $providers = null,
         ?bool $autoLinkByEmail = null,
         ?bool $createUserIfMissing = null,

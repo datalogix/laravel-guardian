@@ -25,7 +25,7 @@ class ConfirmPassword implements HasValidationRules
         $maxAttempts = Guardian::getPasswordConfirmationFeature()->getMaxAttempts();
         $throttleKey = $this->throttleKey($auth->id(), includeIp: false);
 
-        $this->ensureIsNotRateLimited(
+        $this->reserveAttempt(
             $throttleKey,
             $maxAttempts,
             fn (int $seconds) => throw PasswordConfirmationException::rateLimited($seconds)
@@ -39,8 +39,6 @@ class ConfirmPassword implements HasValidationRules
         ];
 
         if (! $this->timeboxedValidate($auth, $credentials)) {
-            $this->hitRateLimiterIfThrottled($throttleKey, $maxAttempts);
-
             throw PasswordConfirmationException::invalid();
         }
 

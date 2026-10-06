@@ -14,6 +14,7 @@ class TwoFactorSetupManager
         protected TwoFactorUser $twoFactorUser,
         protected RecoveryCodes $recoveryCodes,
         protected Totp $totp,
+        protected DeliveredCodes $deliveredCodes,
     ) {
         //
     }
@@ -28,13 +29,15 @@ class TwoFactorSetupManager
             throw TwoFactorSetupException::missingPendingSecret();
         }
 
-        $window = $this->totp->windowFor($method, Guardian::getTwoFactorSetupTtl());
+        $fortress = Guardian::getCurrentOrDefaultFortress();
 
-        if (! $this->totp->verify($pendingSecret, $code, $window)) {
+        $valid = $method->requiresDelivery()
+            ? $this->deliveredCodes->verify($fortress->getTwoFactorSetupSessionKey(), $code, $fortress->getTwoFactorSetupTtl())
+            : $this->totp->verify($pendingSecret, $code, 1) !== false;
+
+        if (! $valid) {
             throw TwoFactorSetupException::invalidCode();
         }
-
-        $fortress = Guardian::getCurrentOrDefaultFortress();
         $storedSecret = $method->value.':'.$pendingSecret;
 
         if (! $this->twoFactorUser->canStoreTwoFactorSecret($user) || ! $this->twoFactorUser->saveTwoFactorSecret($user, $fortress, $storedSecret)) {
@@ -51,6 +54,8 @@ class TwoFactorSetupManager
         }
 
         Guardian::clearTwoFactorSetup();
+
+        app(TwoFactorSecurityChange::class)->apply($user);
 
         if (Guardian::hasPendingTwoFactorSetup()) {
             Guardian::completePendingTwoFactorSetupLogin();

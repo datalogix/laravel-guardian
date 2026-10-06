@@ -25,26 +25,22 @@
     "require": {
         "php": "^8.2",
         "bacon/bacon-qr-code": "^3.0",
-        "illuminate/auth": "^11.0|^12.0|^13.0",
-        "illuminate/console": "^11.0|^12.0|^13.0",
-        "illuminate/contracts": "^11.0|^12.0|^13.0",
-        "illuminate/database": "^11.0|^12.0|^13.0",
-        "illuminate/filesystem": "^11.0|^12.0|^13.0",
-        "illuminate/http": "^11.0|^12.0|^13.0",
-        "illuminate/mail": "^11.0|^12.0|^13.0",
-        "illuminate/notifications": "^11.0|^12.0|^13.0",
-        "illuminate/routing": "^11.0|^12.0|^13.0",
-        "illuminate/session": "^11.0|^12.0|^13.0",
-        "illuminate/support": "^11.0|^12.0|^13.0",
-        "illuminate/validation": "^11.0|^12.0|^13.0",
-        "illuminate/view": "^11.0|^12.0|^13.0",
-        "laravel/socialite": "^5.0",
-        "livewire/livewire": "^3.0|^4.0",
+        "laravel/framework": "^12.0|^13.0",
         "pragmarx/google2fa": "^9.0"
     },
     "require-dev": {
         "graham-campbell/testbench": "^6.3",
-        "laravel/pint": "^1.30"
+        "inertiajs/inertia-laravel": "^2.0|^3.0",
+        "laravel/pint": "^1.30",
+        "laravel/socialite": "^5.11",
+        "livewire/livewire": "^4.4",
+        "phpunit/phpunit": "^11.5"
+    },
+    "suggest": {
+        "datalogix/tallkit": "Provides the <tk:> Blade components the bundled Livewire views are built with (^0.1).",
+        "inertiajs/inertia-laravel": "Required to use the Inertia front-end (^2.0|^3.0).",
+        "laravel/socialite": "Required to use the OAuth / social login feature (^5.11).",
+        "livewire/livewire": "Required to use the Livewire front-end (^4.4)."
     },
     "autoload": {
         "files": [

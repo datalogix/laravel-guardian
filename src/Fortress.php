@@ -13,7 +13,6 @@ class Fortress
     use Concerns\HasIdentifier;
     use Concerns\HasLayouts;
     use Concerns\HasLifecycleHooks;
-    use Concerns\HasLivewireComponents;
     use Concerns\HasLogin;
     use Concerns\HasLogout;
     use Concerns\HasMiddleware;
@@ -28,5 +27,26 @@ class Fortress
     public static function make(): static
     {
         return app(static::class);
+    }
+
+    /**
+     * @return array<int, Features\Feature>
+     */
+    public function getFeatures(): array
+    {
+        return [
+            $this->getLoginFeature(),
+            $this->getLogoutFeature(),
+            $this->getForgotPasswordFeature(),
+            $this->getResetPasswordFeature(),
+            $this->getSignUpFeature(),
+            $this->getPasswordConfirmationFeature(),
+            $this->getEmailVerificationPromptFeature(),
+            $this->getEmailVerificationVerifyFeature(),
+            $this->getTwoFactorSetupFeature(),
+            $this->getTwoFactorChallengeFeature(),
+            $this->getOAuthFeature(),
+            $this->getOAuthCompleteRegistrationFeature(),
+        ];
     }
 }

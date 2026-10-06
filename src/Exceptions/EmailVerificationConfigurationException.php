@@ -23,4 +23,14 @@ class EmailVerificationConfigurationException extends GuardianException
             'or set `isRequired: false` in the `emailVerification()` configuration.'
         );
     }
+
+    public static function missingVerifyRouteForNewUsers(string $fortressId, string $modelClass): static
+    {
+        return new static(
+            "The Fortress [{$fortressId}] creates [{$modelClass}] users, which implement `MustVerifyEmail`, but ".
+            'it has no email verification verify route. Laravel sends every new user the verification email, '.
+            'which would link to a route that was never registered, failing the sign-up. Either enable '.
+            '`emailVerification()` on the fortress or remove `MustVerifyEmail` from the model.'
+        );
+    }
 }

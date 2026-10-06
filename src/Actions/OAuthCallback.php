@@ -10,7 +10,6 @@ use Datalogix\Guardian\Enums\AuthFlowResult;
 use Datalogix\Guardian\Enums\IdentifierKey;
 use Datalogix\Guardian\Enums\OAuthEmailCollisionPolicy;
 use Datalogix\Guardian\Exceptions\OAuthException;
-use Datalogix\Guardian\Exceptions\UnsupportedAuthGuardException;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\Auth\PostAuthenticationFlow;
 use Datalogix\Guardian\Support\OAuth\OAuthIdentities;
@@ -90,7 +89,7 @@ class OAuthCallback
             $existingUser = $this->findUserByEmail($email);
 
             if ($existingUser) {
-                return $this->resolveEmailCollision($existingUser, $oauthUser);
+                return $this->resolveEmailCollision($provider, $existingUser, $oauthUser);
             }
         }
 
@@ -101,20 +100,22 @@ class OAuthCallback
         return $this->createUserFromOAuth($provider, $oauthUser, $providerUserId);
     }
 
-    protected function isOAuthEmailVerified(ProviderUser $oauthUser): bool
+    protected function isOAuthEmailVerified(string $provider, ProviderUser $oauthUser): bool
     {
         $raw = method_exists($oauthUser, 'getRaw') ? (array) $oauthUser->getRaw() : [];
+        $emailVerifiedUsing = Guardian::getOAuthEmailVerifiedUsing();
 
-        foreach (['email_verified', 'verified_email', 'verified'] as $key) {
+        // The application knows its providers, so when it says how to decide, it decides.
+        if ($emailVerifiedUsing instanceof Closure) {
+            return (bool) $emailVerifiedUsing($oauthUser, $raw, $provider);
+        }
+
+        // Only the claims that mean "the e-mail is verified" are trusted: a key such as
+        // "verified" means something else (a verified account) for some providers.
+        foreach (['email_verified', 'verified_email'] as $key) {
             if (array_key_exists($key, $raw)) {
                 return filter_var($raw[$key], FILTER_VALIDATE_BOOLEAN);
             }
-        }
-
-        $emailVerifiedUsing = Guardian::getOAuthEmailVerifiedUsing();
-
-        if ($emailVerifiedUsing instanceof Closure) {
-            return (bool) $emailVerifiedUsing($oauthUser, $raw);
         }
 
         return false;
@@ -139,11 +140,7 @@ class OAuthCallback
             return null;
         }
 
-        try {
-            return Guardian::authProvider()->retrieveById($linkedId);
-        } catch (UnsupportedAuthGuardException) {
-            return null;
-        }
+        return Guardian::authProvider()->retrieveById($linkedId);
     }
 
     protected function findUserByEmail(string $email): ?Authenticatable
@@ -193,7 +190,7 @@ class OAuthCallback
                 email: $email,
                 name: $name,
                 avatar: $oauthUser->getAvatar(),
-                emailVerified: $this->isOAuthEmailVerified($oauthUser),
+                emailVerified: $this->isOAuthEmailVerified($provider, $oauthUser),
                 accessToken: $accessToken,
                 refreshToken: $refreshToken,
                 tokenExpiresAt: $tokenExpiresAt,
@@ -212,7 +209,7 @@ class OAuthCallback
             );
         }
 
-        if ($this->hasEmailVerifiedColumn($modelClass) && $this->isOAuthEmailVerified($oauthUser)) {
+        if ($this->hasEmailVerifiedColumn($modelClass) && $this->isOAuthEmailVerified($provider, $oauthUser)) {
             $attributes['email_verified_at'] = now();
         }
 
@@ -293,28 +290,49 @@ class OAuthCallback
     {
         $candidate = Str::limit($candidate, 20, '');
 
-        if (strlen($candidate) < 5) {
-            $candidate = str_pad($candidate, 5, '0');
-        }
-
         return $modelClass::query()->where($column, $candidate)->exists() ? null : $candidate;
     }
 
-    protected function resolveEmailCollision(Authenticatable $user, ProviderUser $oauthUser): ?Authenticatable
+    protected function resolveEmailCollision(string $provider, Authenticatable $user, ProviderUser $oauthUser): ?Authenticatable
     {
         return match (Guardian::getOAuthEmailCollisionPolicy()) {
-            OAuthEmailCollisionPolicy::LinkExisting => $this->linkExistingIfAllowed($user, $oauthUser),
+            OAuthEmailCollisionPolicy::LinkExisting => $this->linkExistingIfAllowed($provider, $user, $oauthUser),
             OAuthEmailCollisionPolicy::DenyWithError => throw OAuthException::emailAlreadyExists(),
             OAuthEmailCollisionPolicy::RequireManualLink => throw OAuthException::manualLinkRequired(),
         };
     }
 
-    protected function linkExistingIfAllowed(Authenticatable $user, ProviderUser $oauthUser): Authenticatable
+    protected function linkExistingIfAllowed(string $provider, Authenticatable $user, ProviderUser $oauthUser): Authenticatable
     {
-        if (! Guardian::shouldAutoLinkOAuthByEmail() || ! $this->isOAuthEmailVerified($oauthUser)) {
+        if (! Guardian::shouldAutoLinkOAuthByEmail()) {
+            throw OAuthException::emailAlreadyExists();
+        }
+
+        if (! $this->isOAuthEmailVerified($provider, $oauthUser)) {
+            $this->warnAboutIgnoredVerifiedClaim($provider, $oauthUser);
+
             throw OAuthException::emailAlreadyExists();
         }
 
         return $user;
+    }
+
+    /**
+     * A "verified" claim is not trusted on its own, so an application that relied on it
+     * would only see its users being refused: tell it what to configure.
+     */
+    protected function warnAboutIgnoredVerifiedClaim(string $provider, ProviderUser $oauthUser): void
+    {
+        $raw = method_exists($oauthUser, 'getRaw') ? (array) $oauthUser->getRaw() : [];
+
+        if (Guardian::getOAuthEmailVerifiedUsing() !== null || ! array_key_exists('verified', $raw)) {
+            return;
+        }
+
+        logger()->warning(
+            "Guardian did not link the [{$provider}] account to the user with the same e-mail, because the e-mail is not verified. ".
+            'The provider sent a [verified] claim, which Guardian does not trust on its own: if it means the e-mail is verified, '.
+            'say so with the emailVerifiedUsing option of oauth().'
+        );
     }
 }

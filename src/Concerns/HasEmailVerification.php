@@ -2,8 +2,8 @@
 
 namespace Datalogix\Guardian\Concerns;
 
+use BackedEnum;
 use Closure;
-use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Features\EmailVerificationPromptFeature;
 use Datalogix\Guardian\Features\EmailVerificationVerifyFeature;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -36,7 +36,7 @@ trait HasEmailVerification
         ?string $promptRouteSlug = null,
         ?string $promptRouteName = null,
         string|Closure|null $promptResponse = null,
-        Layout|string|null $promptLayout = null,
+        BackedEnum|string|null $promptLayout = null,
         string|Closure|array|false|null $verifyRouteAction = null,
         ?string $verifyRouteSlug = null,
         ?string $verifyRouteName = null,

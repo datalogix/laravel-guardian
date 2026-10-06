@@ -19,9 +19,12 @@ class TwoFactorSetupException extends ValidationException
         return static::failed();
     }
 
+    /**
+     * The user did nothing wrong: the application could not store the secret.
+     */
     public static function unableToStoreSecret(): static
     {
-        return static::failed();
+        return static::withMessages(['code' => [__('We could not save your two-factor settings. Please try again later.')]]);
     }
 
     protected static function failed(): static

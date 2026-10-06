@@ -39,6 +39,6 @@ class TwoFactorSetupFeature extends Feature
 
     public function registerRoutes(): void
     {
-        $this->registerRoute('get', $this->getRouteSlug(), EnsureTwoFactorSetupAccess::class);
+        $this->registerPageRoute($this->getRouteSlug(), EnsureTwoFactorSetupAccess::class);
     }
 }

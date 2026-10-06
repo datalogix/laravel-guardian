@@ -39,6 +39,6 @@ class ResetPasswordFeature extends Feature
 
     public function registerRoutes(): void
     {
-        $this->registerRoute('get', $this->getRouteSlug().'/{token?}', [RedirectIfAuthenticated::class, 'signed']);
+        $this->registerPageRoute($this->getRouteSlug().'/{token?}', [RedirectIfAuthenticated::class, 'signed']);
     }
 }

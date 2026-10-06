@@ -39,7 +39,7 @@ class OAuthCompleteRegistrationFeature extends Feature
 
     public function registerRoutes(): void
     {
-        $this->registerRoute('get', $this->getRouteSlug(), array_filter([
+        $this->registerPageRoute($this->getRouteSlug(), array_filter([
             EnsureOAuthCompleteRegistrationAccess::class,
             $this->throttleMiddleware(),
         ]));

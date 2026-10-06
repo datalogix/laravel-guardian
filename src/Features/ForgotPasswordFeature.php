@@ -39,6 +39,6 @@ class ForgotPasswordFeature extends Feature
 
     public function registerRoutes(): void
     {
-        $this->registerRoute('get', $this->getRouteSlug(), RedirectIfAuthenticated::class);
+        $this->registerPageRoute($this->getRouteSlug(), RedirectIfAuthenticated::class);
     }
 }

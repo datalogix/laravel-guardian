@@ -5,6 +5,7 @@ namespace Datalogix\Guardian\Actions\Concerns;
 use Closure;
 use Datalogix\Guardian\Actions\SendEmailVerificationNotification;
 use Datalogix\Guardian\Guardian;
+use Datalogix\Guardian\Support\Auth\FrameworkVerificationListener;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Database\Eloquent\MassAssignmentException;
 use Illuminate\Database\Eloquent\Model;
@@ -50,6 +51,9 @@ trait CreatesAuthenticatableUser
     {
         event(new Registered($user));
 
-        app(SendEmailVerificationNotification::class)($user);
+        // Otherwise the user would get the verification e-mail twice.
+        if (! FrameworkVerificationListener::isRegistered()) {
+            app(SendEmailVerificationNotification::class)($user);
+        }
     }
 }

@@ -38,6 +38,6 @@ class EmailVerificationPromptFeature extends Feature
 
     public function registerRoutes(): void
     {
-        $this->registerRoute('get', $this->getRouteSlug(), $this->fortress->getAuthMiddleware());
+        $this->registerPageRoute($this->getRouteSlug(), $this->fortress->getAuthMiddleware());
     }
 }

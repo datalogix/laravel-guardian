@@ -7,6 +7,7 @@ use Datalogix\Guardian\Events\TwoFactorTrustedDeviceRevoked;
 use Datalogix\Guardian\Events\TwoFactorTrustedDevicesRevokedAll;
 use Datalogix\Guardian\Fortress;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cookie;
 
 class TwoFactorTrustedDeviceManager
@@ -53,7 +54,10 @@ class TwoFactorTrustedDeviceManager
             'lax',
         ));
 
-        event(new TwoFactorTrustedDeviceRemembered($fortress, $user, (int) $issued['id']));
+        // The events carry an Eloquent user, like every two-factor event of Guardian.
+        if ($user instanceof Model) {
+            event(new TwoFactorTrustedDeviceRemembered($fortress, $user, (int) $issued['id']));
+        }
     }
 
     public function forget(string $cookieName): void
@@ -77,7 +81,7 @@ class TwoFactorTrustedDeviceManager
     {
         $revoked = $this->trustedDevices->revoke($deviceId, $fortress, $user);
 
-        if ($revoked) {
+        if ($revoked && $user instanceof Model) {
             event(new TwoFactorTrustedDeviceRevoked($fortress, $user, $deviceId));
         }
 
@@ -88,7 +92,7 @@ class TwoFactorTrustedDeviceManager
     {
         $count = $this->trustedDevices->revokeAll($fortress, $user);
 
-        if ($count > 0) {
+        if ($count > 0 && $user instanceof Model) {
             event(new TwoFactorTrustedDevicesRevokedAll($fortress, $user, $count));
         }
 

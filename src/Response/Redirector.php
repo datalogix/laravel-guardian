@@ -11,18 +11,9 @@ class Redirector
         bool $intended = false,
         bool $navigate = true
     ) {
-        $path ??= Guardian::getUrl();
-        $livewire = app('livewire')?->current();
-
-        if ($livewire) {
-            return $intended
-                ? $livewire->redirectIntended($path, navigate: $navigate)
-                : $livewire->redirect($path, navigate: $navigate);
-        }
-
-        return $intended
-            ? redirect()->intended($path)
-            : redirect()->to($path);
+        return Guardian::getCurrentOrDefaultFortress()
+            ->getFrameworkAdapter()
+            ->redirect($path ?? Guardian::getUrl(), $intended, $navigate);
     }
 
     public static function redirectIntended(?string $path = null, bool $navigate = true)

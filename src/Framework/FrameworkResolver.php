@@ -7,31 +7,43 @@ use InvalidArgumentException;
 
 class FrameworkResolver
 {
-    protected array $factories = [];
+    /**
+     * @var array<string, FrameworkAdapter>
+     */
+    protected array $adapters = [];
 
-    public function register(Framework $framework, ComponentFactory $factory): void
+    public function register(FrameworkAdapter $adapter): void
     {
-        $this->factories[$framework->value] = $factory;
+        $this->adapters[$adapter->framework()->value] = $adapter;
+    }
+
+    /**
+     * @return array<string, FrameworkAdapter>
+     */
+    public function adapters(): array
+    {
+        return $this->adapters;
+    }
+
+    public function adapter(?Framework $framework = null): FrameworkAdapter
+    {
+        $framework ??= $this->configuredFramework();
+
+        return $this->adapters[$framework->value]
+            ?? throw new InvalidArgumentException("No framework adapter registered for framework [{$framework->value}].");
     }
 
     public function resolveComponent(string $componentName, ?Framework $framework = null): string
     {
-        if (! $framework) {
-            $config = config('guardian.framework');
+        return $this->adapter($framework)->pageAction($componentName);
+    }
 
-            $framework = $config instanceof Framework ? $config : Framework::tryFrom($config);
-        }
+    protected function configuredFramework(): Framework
+    {
+        $config = config('guardian.framework');
 
-        if (! $framework) {
-            throw new InvalidArgumentException('Unknown framework configured');
-        }
+        $framework = $config instanceof Framework ? $config : Framework::tryFrom($config);
 
-        $key = $framework->value;
-
-        if (! isset($this->factories[$key])) {
-            throw new InvalidArgumentException("No component factory registered for framework [{$key}].");
-        }
-
-        return $this->factories[$key]->resolve($componentName);
+        return $framework ?? throw new InvalidArgumentException('Unknown framework configured');
     }
 }

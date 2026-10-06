@@ -3,7 +3,6 @@
 namespace Datalogix\Guardian\Concerns;
 
 use Datalogix\Guardian\Http\Middleware\SetUpFortress;
-use Livewire\Livewire;
 
 trait HasMiddleware
 {
@@ -11,7 +10,7 @@ trait HasMiddleware
 
     protected array $authMiddleware = [];
 
-    protected array $livewirePersistentMiddleware = [];
+    protected array $persistentMiddlewareStack = [];
 
     public function middleware(array $middleware, bool $isPersistent = false): static
     {
@@ -39,8 +38,8 @@ trait HasMiddleware
 
     public function persistentMiddleware(array $middleware): static
     {
-        $this->livewirePersistentMiddleware = [
-            ...$this->livewirePersistentMiddleware,
+        $this->persistentMiddlewareStack = [
+            ...$this->persistentMiddlewareStack,
             ...$middleware,
         ];
 
@@ -60,10 +59,16 @@ trait HasMiddleware
         return $this->authMiddleware;
     }
 
-    protected function registerLivewirePersistentMiddleware(): void
+    /**
+     * The persistent middleware still waiting to be handed to the framework
+     * adapter; reading it empties the stack.
+     */
+    public function pullPersistentMiddleware(): array
     {
-        Livewire::addPersistentMiddleware($this->livewirePersistentMiddleware);
+        $middleware = $this->persistentMiddlewareStack;
 
-        $this->livewirePersistentMiddleware = [];
+        $this->persistentMiddlewareStack = [];
+
+        return $middleware;
     }
 }

@@ -3,6 +3,7 @@
 namespace Datalogix\Guardian\Concerns;
 
 use Datalogix\Guardian\Http\Middleware\Authenticate;
+use Datalogix\Guardian\Http\Middleware\AuthenticateSession;
 use Datalogix\Guardian\Http\Middleware\DispatchServingGuardianEvent;
 
 trait HasModes
@@ -17,7 +18,7 @@ trait HasModes
             ->passwordReset()
             ->passwordConfirmation()
             ->middleware(['web', DispatchServingGuardianEvent::class])
-            ->authMiddleware([Authenticate::class]);
+            ->authMiddleware([Authenticate::class, AuthenticateSession::class]);
     }
 
     public function admin(string $id = 'admin'): static

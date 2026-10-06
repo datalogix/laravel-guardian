@@ -1,0 +1,7 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "jsx": "react-jsx"
+    },
+    "include": ["src/Framework/Inertia/resources/js/react/**/*.ts", "src/Framework/Inertia/resources/js/react/**/*.tsx"]
+}

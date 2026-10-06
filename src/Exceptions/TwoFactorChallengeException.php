@@ -21,6 +21,6 @@ class TwoFactorChallengeException extends ValidationException
 
     public static function rateLimited(int $seconds): static
     {
-        return static::rateLimitedMessage('code', $seconds);
+        return static::rateLimitedMessage('code', $seconds, 'auth.throttle');
     }
 }

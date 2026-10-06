@@ -7,6 +7,7 @@ use Datalogix\Guardian\Exceptions\TwoFactorChallengeException;
 use Datalogix\Guardian\Exceptions\TwoFactorDeliveryException;
 use Datalogix\Guardian\Exceptions\TwoFactorSecretDecryptionException;
 use Datalogix\Guardian\Guardian;
+use Datalogix\Guardian\Http\Middleware\AuthenticateSession;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Session;
@@ -69,6 +70,9 @@ class PostAuthenticationFlow
         Guardian::clearPendingTwoFactorSetup();
 
         Session::regenerate();
+
+        AuthenticateSession::storePasswordHash($user);
+        AuthenticateSession::storeTwoFactorState($user);
     }
 
     protected function secretUnreadableException(): ValidationException

@@ -2,19 +2,21 @@
 
 namespace Datalogix\Guardian;
 
-use Datalogix\Guardian\Enums\Framework;
 use Datalogix\Guardian\Enums\IdentifierKey;
 use Datalogix\Guardian\Exceptions\EmailVerificationConfigurationException;
 use Datalogix\Guardian\Exceptions\FortressIdException;
-use Datalogix\Guardian\Exceptions\FrameworkConfigurationException;
 use Datalogix\Guardian\Exceptions\IdentifierColumnConfigurationException;
 use Datalogix\Guardian\Exceptions\MultipleDefaultFortressesException;
 use Datalogix\Guardian\Exceptions\NoDefaultFortressSetException;
 use Datalogix\Guardian\Exceptions\NoFortressRegisteredException;
+use Datalogix\Guardian\Exceptions\OAuthConfigurationException;
 use Datalogix\Guardian\Exceptions\OAuthProviderNotConfiguredException;
+use Datalogix\Guardian\Support\Auth\FrameworkVerificationListener;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use Laravel\Socialite\Facades\Socialite;
 
 class FortressRegistry
 {
@@ -114,10 +116,12 @@ class FortressRegistry
             throw MultipleDefaultFortressesException::make();
         }
 
+        $this->validateFrameworkConfiguration();
         $this->validateEmailVerificationConfiguration();
+        $this->validateOAuthDependencies();
         $this->validateOAuthProviderConfiguration();
         $this->validateIdentifierColumnConfiguration();
-        $this->validateFrameworkConfiguration();
+        $this->validateVerificationOfNewUsers();
     }
 
     protected function validateEmailVerificationConfiguration(): void
@@ -135,6 +139,46 @@ class FortressRegistry
                 throw EmailVerificationConfigurationException::missingVerifyRoute($fortress->getId());
             }
         }
+    }
+
+    /**
+     * Only when Laravel itself sends the verification e-mail of new users: Guardian
+     * does not send it for a fortress without the verify route.
+     */
+    protected function validateVerificationOfNewUsers(): void
+    {
+        if (! FrameworkVerificationListener::isRegistered()) {
+            return;
+        }
+
+        foreach ($this->all() as $fortress) {
+            $createsUsers = $fortress->getSignUpFeature()->hasFeature()
+                || ($fortress->getOAuthFeature()->hasFeature() && $fortress->shouldCreateOAuthUserIfMissing());
+
+            if (! $createsUsers || $fortress->getEmailVerificationVerifyFeature()->hasFeature()) {
+                continue;
+            }
+
+            $modelClass = $fortress->authModelClass();
+
+            if (is_subclass_of($modelClass, MustVerifyEmail::class)) {
+                throw EmailVerificationConfigurationException::missingVerifyRouteForNewUsers($fortress->getId(), $modelClass);
+            }
+        }
+    }
+
+    protected function validateOAuthDependencies(): void
+    {
+        foreach ($this->all() as $fortress) {
+            if ($fortress->getOAuthFeature()->hasFeature() && ! $this->socialiteIsInstalled()) {
+                throw OAuthConfigurationException::socialiteNotInstalled($fortress->getId());
+            }
+        }
+    }
+
+    protected function socialiteIsInstalled(): bool
+    {
+        return class_exists(Socialite::class);
     }
 
     protected function validateOAuthProviderConfiguration(): void
@@ -187,8 +231,13 @@ class FortressRegistry
     protected function validateFrameworkConfiguration(): void
     {
         foreach ($this->all() as $fortress) {
-            if ($fortress->getFramework() === Framework::Inertia) {
-                throw FrameworkConfigurationException::unimplemented($fortress->getId(), Framework::Inertia->value);
+            $fortress->getFrameworkAdapter();
+
+            foreach ($fortress->getFeatures() as $feature) {
+                // Resolving the route action of an enabled feature asks the framework
+                // adapter for its bundled page, which throws when the framework package
+                // is not installed and the feature does not bring its own route action.
+                $feature->getRouteAction();
             }
         }
     }

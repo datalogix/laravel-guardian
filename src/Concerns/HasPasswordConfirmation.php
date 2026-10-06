@@ -2,8 +2,8 @@
 
 namespace Datalogix\Guardian\Concerns;
 
+use BackedEnum;
 use Closure;
-use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Features\PasswordConfirmationFeature;
 
 trait HasPasswordConfirmation
@@ -24,7 +24,7 @@ trait HasPasswordConfirmation
         string|Closure|null $response = null,
         string|Closure|null $middlewareName = null,
         int|false|null $maxAttempts = null,
-        Layout|string|null $layout = null,
+        BackedEnum|string|null $layout = null,
     ): static {
         $this->getPasswordConfirmationFeature()->configure(
             $routeAction,

@@ -5,7 +5,6 @@ namespace Datalogix\Guardian\Actions;
 use Datalogix\Guardian\Actions\Concerns\HasRateLimiter;
 use Datalogix\Guardian\Exceptions\GuardianException;
 use Datalogix\Guardian\Guardian;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Model;
 
@@ -32,7 +31,6 @@ class SendEmailVerificationNotification
                 throw new GuardianException('The ['.$user::class.'] model must use the Notifiable trait to receive email verification notifications.');
             }
 
-            VerifyEmail::createUrlUsing(fn (mixed $notifiable) => Guardian::getVerifyEmailUrl($notifiable));
             $user->sendEmailVerificationNotification();
 
             return true;

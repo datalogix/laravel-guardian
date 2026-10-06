@@ -3,39 +3,32 @@
 namespace Datalogix\Guardian\Actions\Concerns;
 
 use Closure;
+use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Guardian;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Support\Facades\RateLimiter;
-use Throwable;
 
 trait HasRateLimiter
 {
-    protected function ensureIsNotRateLimited(string $throttleKey, int|false|null $maxAttempts, Closure $onLockout): void
+    /**
+     * Counts the attempt before it is made, and stops it past the limit. Counting
+     * first, with the count the cache returns atomically, is what holds attempts
+     * sent at the same time: checking first would let them all through before any
+     * of them was counted. An attempt that succeeds clears the count.
+     */
+    protected function reserveAttempt(string $throttleKey, int|false|null $maxAttempts, Closure $onLockout, ?int $decaySeconds = null): mixed
     {
         if (! $this->shouldThrottle($maxAttempts)) {
-            return;
+            return null;
         }
 
-        if (! RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
-            return;
+        if (RateLimiter::hit($throttleKey, $decaySeconds ?? 60) <= $maxAttempts) {
+            return null;
         }
 
         event(new Lockout(request()));
 
-        $onLockout(RateLimiter::availableIn($throttleKey));
-    }
-
-    protected function hitRateLimiterIfThrottled(string $throttleKey, int|false|null $maxAttempts, ?int $decaySeconds = null): void
-    {
-        if (! $this->shouldThrottle($maxAttempts)) {
-            return;
-        }
-
-        if ($decaySeconds === null) {
-            RateLimiter::hit($throttleKey);
-        } else {
-            RateLimiter::hit($throttleKey, $decaySeconds);
-        }
+        return $onLockout(RateLimiter::availableIn($throttleKey));
     }
 
     protected function clearRateLimiterIfThrottled(string $throttleKey, int|false|null $maxAttempts): void
@@ -72,24 +65,16 @@ trait HasRateLimiter
 
         $throttleKey = $this->throttleKey($key, $includeIp);
 
-        if (RateLimiter::tooManyAttempts($throttleKey, $maxAttempts)) {
+        if (RateLimiter::hit($throttleKey) > $maxAttempts) {
             event(new Lockout(request()));
 
             return $onLockout(RateLimiter::availableIn($throttleKey));
         }
 
-        try {
-            $result = $callback();
-        } catch (Throwable $exception) {
-            RateLimiter::hit($throttleKey);
-
-            throw $exception;
-        }
+        $result = $callback();
 
         if ($clearOnSuccess) {
             RateLimiter::clear($throttleKey);
-        } else {
-            RateLimiter::hit($throttleKey);
         }
 
         return $result ?? true;
@@ -100,12 +85,25 @@ trait HasRateLimiter
         return is_int($maxAttempts) && $maxAttempts > 0;
     }
 
+    /**
+     * Scoped to the fortress and its guard: fortresses may have users of their own,
+     * with the same IDs or logins, whose attempts must not count against each other.
+     */
     protected function throttleKey(?string $key = null, bool $includeIp = true): string
     {
+        $fortress = $this->throttledFortress();
+
         return sha1(implode('|', array_filter([
             static::class,
+            $fortress->getId(),
+            $fortress->getGuard(),
             $includeIp ? request()->ip() : null,
             $key,
         ])));
+    }
+
+    protected function throttledFortress(): Fortress
+    {
+        return $this instanceof Fortress ? $this : Guardian::getCurrentOrDefaultFortress();
     }
 }

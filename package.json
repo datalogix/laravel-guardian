@@ -1,0 +1,20 @@
+{
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "typecheck": "npm run typecheck:vue && npm run typecheck:react",
+        "typecheck:vue": "vue-tsc -p tsconfig.vue.json",
+        "typecheck:react": "tsc -p tsconfig.react.json"
+    },
+    "devDependencies": {
+        "@inertiajs/react": "^3.8.0",
+        "@inertiajs/vue3": "^3.8.0",
+        "@types/react": "^19.3.0",
+        "@types/react-dom": "^19.3.0",
+        "react": "^19.3.0",
+        "react-dom": "^19.3.0",
+        "typescript": "^6.0.3",
+        "vue": "^3.5.43",
+        "vue-tsc": "^3.3.12"
+    }
+}

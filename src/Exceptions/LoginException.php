@@ -24,6 +24,6 @@ class LoginException extends ValidationException
 
     public static function rateLimited(int $seconds): static
     {
-        return static::rateLimitedMessage('login', $seconds);
+        return static::rateLimitedMessage('login', $seconds, 'auth.throttle');
     }
 }

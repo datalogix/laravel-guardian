@@ -8,6 +8,7 @@ use Datalogix\Guardian\Enums\TwoFactorMethod;
 use Datalogix\Guardian\Exceptions\PasswordConfirmationException;
 use Datalogix\Guardian\Exceptions\TwoFactorSetupException;
 use Datalogix\Guardian\Guardian;
+use Datalogix\Guardian\Support\TwoFactor\DeliveredCodes;
 use Datalogix\Guardian\Support\TwoFactor\QrCode;
 use Datalogix\Guardian\Support\TwoFactor\Totp;
 use Illuminate\Database\Eloquent\Model;
@@ -41,7 +42,10 @@ class PrepareTwoFactorSetup
                 $uri = $totp->makeOtpAuthUri($secret, $account);
 
                 if ($user instanceof Model && $method->requiresDelivery()) {
-                    Guardian::dispatchTwoFactorCode($user, $method, $totp->currentCode($secret), 'setup');
+                    $fortress = Guardian::getCurrentOrDefaultFortress();
+                    $code = app(DeliveredCodes::class)->issue($fortress->getTwoFactorSetupSessionKey(), $fortress->getTwoFactorSetupTtl());
+
+                    Guardian::dispatchTwoFactorCode($user, $method, $code, 'setup');
                 }
 
                 return [

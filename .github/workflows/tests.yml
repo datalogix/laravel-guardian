@@ -1,0 +1,72 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    uses: datalogix/workflows/.github/workflows/laravel-tests.yml@v1
+    secrets: inherit
+
+  typecheck:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    name: Typecheck Inertia pages
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Typecheck Vue and React pages
+        run: npm run typecheck
+
+  without-optional-dependency:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: livewire/livewire
+            group: livewire
+          - package: inertiajs/inertia-laravel
+            group: inertia
+          - package: laravel/socialite
+            group: socialite
+
+    name: Without ${{ matrix.package }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, gd
+          coverage: none
+
+      - name: Install dependencies without ${{ matrix.package }}
+        run: |
+          composer remove --dev ${{ matrix.package }} --no-update --no-interaction
+          composer update --prefer-dist --no-interaction
+
+      - name: Execute tests
+        run: vendor/bin/phpunit --no-coverage --exclude-group ${{ matrix.group }}

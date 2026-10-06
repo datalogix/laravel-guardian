@@ -189,12 +189,8 @@ class TwoFactorUser
         return true;
     }
 
-    protected function forgetResolvedSecretCache(mixed $user, Fortress $fortress): void
+    protected function forgetResolvedSecretCache(object $user, Fortress $fortress): void
     {
-        if (! is_object($user)) {
-            return;
-        }
-
         unset($this->resolvedSecretCache[$this->secretCacheKey($user, $fortress)]);
     }
 
@@ -221,7 +217,7 @@ class TwoFactorUser
 
     public function saveTwoFactorRecoveryCodes(mixed $user, Fortress $fortress, array $codes): bool
     {
-        return $this->persistTwoFactorRecoveryCodes($user, $fortress, $codes, alreadyHashed: false);
+        return $this->persistTwoFactorRecoveryCodes($user, $fortress, $codes);
     }
 
     public function getTwoFactorRecoveryCodesCount(mixed $user, Fortress $fortress): int
@@ -258,7 +254,7 @@ class TwoFactorUser
             return false;
         }
 
-        return $this->persistTwoFactorRecoveryCodes($user, $fortress, $remaining, alreadyHashed: true);
+        return $this->persistTwoFactorRecoveryCodes($user, $fortress, $remaining);
     }
 
     protected function consumeStoredRecoveryCodeWithLock(Model $user, Fortress $fortress, string $normalizedCandidate): bool
@@ -297,10 +293,6 @@ class TwoFactorUser
         $consumed = false;
 
         foreach ($available as $code) {
-            if (! is_string($code) || blank($code)) {
-                continue;
-            }
-
             if (! $consumed && $this->isRecoveryCodeMatch($code, $normalizedCandidate, $hashedCandidate)) {
                 $consumed = true;
 
@@ -313,7 +305,7 @@ class TwoFactorUser
         return $consumed ? $remaining : null;
     }
 
-    protected function persistTwoFactorRecoveryCodes(mixed $user, Fortress $fortress, array $codes, bool $alreadyHashed): bool
+    protected function persistTwoFactorRecoveryCodes(mixed $user, Fortress $fortress, array $codes): bool
     {
         if ($user instanceof CanManageTwoFactorRecoveryCodes) {
             $user->saveTwoFactorRecoveryCodes($fortress, $codes);
@@ -327,9 +319,7 @@ class TwoFactorUser
             return false;
         }
 
-        $codes = $alreadyHashed
-            ? array_values($codes)
-            : array_map(fn (string $code) => $this->hashRecoveryCode($code), array_values($codes));
+        $codes = array_map(fn (string $code) => $this->hashRecoveryCode($code), array_values($codes));
 
         $user->forceFill([
             $this->getRecoveryCodesColumn() => json_encode($codes),
@@ -340,12 +330,8 @@ class TwoFactorUser
         return true;
     }
 
-    protected function forgetRawRecoveryCodesCache(mixed $user, Fortress $fortress): void
+    protected function forgetRawRecoveryCodesCache(object $user, Fortress $fortress): void
     {
-        if (! is_object($user)) {
-            return;
-        }
-
         unset($this->rawRecoveryCodesCache[$this->secretCacheKey($user, $fortress)]);
     }
 

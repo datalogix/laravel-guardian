@@ -4,11 +4,11 @@ namespace Datalogix\Guardian\Exceptions;
 
 class FrameworkConfigurationException extends GuardianException
 {
-    public static function unimplemented(string $fortressId, string $framework): static
+    public static function dependencyMissing(string $framework, string $package): static
     {
         return new static(
-            "The Fortress [{$fortressId}] is configured to use the [{$framework}] framework integration, ".
-            'which is not implemented yet. Use Framework::Livewire instead.'
+            "The [{$framework}] framework integration requires the [{$package}] package, which is not installed. ".
+            "Run [composer require {$package}], or pass your own route action to every feature you enable."
         );
     }
 }

@@ -31,8 +31,8 @@ trait HasAuth
 
     public function guard(string $guard): static
     {
-        if (strlen($guard) > HasId::MAX_ID_LENGTH) {
-            throw FortressIdException::guardTooLong($guard, HasId::MAX_ID_LENGTH);
+        if (strlen($guard) > static::MAX_ID_LENGTH) {
+            throw FortressIdException::guardTooLong($guard, static::MAX_ID_LENGTH);
         }
 
         $this->guard = $guard;

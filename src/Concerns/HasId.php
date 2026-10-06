@@ -21,7 +21,6 @@ trait HasId
         }
 
         $this->id = $id;
-        $this->restoreCachedComponents();
 
         return $this;
     }

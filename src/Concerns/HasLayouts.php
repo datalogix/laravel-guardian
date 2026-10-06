@@ -2,35 +2,44 @@
 
 namespace Datalogix\Guardian\Concerns;
 
-use Datalogix\Guardian\Enums\Layout;
+use BackedEnum;
 
+/**
+ * The layout hints of the fortress: which layout each page asks for. What a
+ * layout means, and the default when none is set, is up to the front-end.
+ */
 trait HasLayouts
 {
-    protected string $layout = Layout::Simple->value;
+    protected ?string $layout = null;
 
     protected array $layoutsForPage = [];
 
-    public function layout(string|Layout $layout): static
+    public function layout(string|BackedEnum $layout): static
     {
-        $this->layout = $layout instanceof Layout ? $layout->value : $layout;
+        $this->layout = $this->layoutName($layout);
 
         return $this;
     }
 
-    public function layoutForPage(string $page, string|Layout|null $layout = null): static
+    public function layoutForPage(string $page, string|BackedEnum|null $layout = null): static
     {
-        $this->layoutsForPage[$page] = $layout instanceof Layout ? $layout->value : $layout;
+        $this->layoutsForPage[$page] = $layout === null ? null : $this->layoutName($layout);
 
         return $this;
     }
 
-    public function getLayout(): string
+    public function getLayout(): ?string
     {
         return $this->layout;
     }
 
-    public function getLayoutForPage(string $page): string
+    public function getLayoutForPage(string $page): ?string
     {
         return $this->layoutsForPage[$page] ?? $this->getLayout();
+    }
+
+    protected function layoutName(string|BackedEnum $layout): string
+    {
+        return $layout instanceof BackedEnum ? (string) $layout->value : $layout;
     }
 }

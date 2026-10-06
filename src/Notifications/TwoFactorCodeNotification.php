@@ -3,21 +3,27 @@
 namespace Datalogix\Guardian\Notifications;
 
 use Datalogix\Guardian\Notifications\Concerns\HasTwoFactorCodeContext;
+use Datalogix\Guardian\Notifications\Concerns\QueuesTwoFactorCode;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class TwoFactorCodeNotification extends Notification implements ShouldQueue
+/**
+ * Queued encrypted, since the payload of the job carries the code.
+ */
+class TwoFactorCodeNotification extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use HasTwoFactorCodeContext;
     use Queueable;
+    use QueuesTwoFactorCode;
 
     public function __construct(
-        protected string $code,
+        public readonly string $code,
         protected string $context,
     ) {
-        //
+        $this->queueTwoFactorCode();
     }
 
     public function via(object $notifiable): array

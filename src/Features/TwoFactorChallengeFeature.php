@@ -40,7 +40,7 @@ class TwoFactorChallengeFeature extends Feature
 
     public function registerRoutes(): void
     {
-        $this->registerRoute('get', $this->getRouteSlug(), [
+        $this->registerPageRoute($this->getRouteSlug(), [
             RedirectIfAuthenticated::class,
             EnsureTwoFactorChallengeAccess::class,
         ]);

@@ -2,8 +2,8 @@
 
 namespace Datalogix\Guardian\Concerns;
 
+use BackedEnum;
 use Closure;
-use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Features\SignUpFeature;
 
 trait HasSignUp
@@ -21,7 +21,7 @@ trait HasSignUp
         ?string $routeName = null,
         string|Closure|null $response = null,
         int|false|null $maxAttempts = null,
-        Layout|string|null $layout = null,
+        BackedEnum|string|null $layout = null,
     ): static {
         $this->getSignUpFeature()->configure(
             $routeAction,

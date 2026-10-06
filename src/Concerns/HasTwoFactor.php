@@ -2,16 +2,16 @@
 
 namespace Datalogix\Guardian\Concerns;
 
+use BackedEnum;
 use Closure;
 use Datalogix\Guardian\Actions\Concerns\HasRateLimiter;
-use Datalogix\Guardian\Enums\Layout;
 use Datalogix\Guardian\Enums\TwoFactorMethod;
 use Datalogix\Guardian\Exceptions\TwoFactorChallengeException;
 use Datalogix\Guardian\Exceptions\UnsupportedAuthGuardException;
 use Datalogix\Guardian\Features\TwoFactorChallengeFeature;
 use Datalogix\Guardian\Features\TwoFactorSetupFeature;
 use Datalogix\Guardian\Support\Auth\PostAuthenticationFlow;
-use Datalogix\Guardian\Support\TwoFactor\Totp;
+use Datalogix\Guardian\Support\TwoFactor\DeliveredCodes;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorDeliveryManager;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorSessionManager;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorTrustedDeviceManager;
@@ -75,7 +75,7 @@ trait HasTwoFactor
         ?string $challengeRouteName = null,
         string|Closure|null $challengeResponse = null,
         int|false|null $challengeMaxAttempts = null,
-        Layout|string|null $challengeLayout = null,
+        BackedEnum|string|null $challengeLayout = null,
         int|false|null $challengeTtl = null,
         int|false|null $challengeResendMaxAttempts = null,
         int|false|null $challengeResendDecaySeconds = null,
@@ -88,7 +88,7 @@ trait HasTwoFactor
         ?string $setupRouteName = null,
         string|Closure|null $setupResponse = null,
         int|false|null $setupMaxAttempts = null,
-        Layout|string|null $setupLayout = null,
+        BackedEnum|string|null $setupLayout = null,
         int|false|null $setupTtl = null,
         ?bool $requireSetupOnLogin = null,
         ?TwoFactorMethod $method = null,
@@ -206,17 +206,14 @@ trait HasTwoFactor
         $maxAttempts = $this->getTwoFactorChallengeResendMaxAttempts();
         $throttleKey = $this->throttleKey($this->twoFactorChallengeStartThrottleKeyPart($user), includeIp: false);
 
-        $this->ensureIsNotRateLimited(
+        $this->reserveAttempt(
             $throttleKey,
             $maxAttempts,
-            fn (int $seconds) => throw TwoFactorChallengeException::rateLimited($seconds)
+            fn (int $seconds) => throw TwoFactorChallengeException::rateLimited($seconds),
+            $this->getTwoFactorChallengeResendDecaySeconds() ?: null,
         );
 
-        try {
-            $this->dispatchTwoFactorChallengeCode($user, $method);
-        } finally {
-            $this->hitRateLimiterIfThrottled($throttleKey, $maxAttempts, $this->getTwoFactorChallengeResendDecaySeconds() ?: null);
-        }
+        $this->dispatchTwoFactorChallengeCode($user, $method);
     }
 
     public function getTwoFactorChallengeSession(): ?array
@@ -266,17 +263,14 @@ trait HasTwoFactor
         $maxAttempts = $this->getTwoFactorChallengeResendMaxAttempts();
         $throttleKey = $this->throttleKey($this->twoFactorChallengeResendThrottleKeyPart($user), includeIp: false);
 
-        $this->ensureIsNotRateLimited(
+        $this->reserveAttempt(
             $throttleKey,
             $maxAttempts,
-            fn (int $seconds) => throw TwoFactorChallengeException::rateLimited($seconds)
+            fn (int $seconds) => throw TwoFactorChallengeException::rateLimited($seconds),
+            $this->getTwoFactorChallengeResendDecaySeconds() ?: null,
         );
 
-        try {
-            return $this->dispatchTwoFactorChallengeCode($user, $method);
-        } finally {
-            $this->hitRateLimiterIfThrottled($throttleKey, $maxAttempts, $this->getTwoFactorChallengeResendDecaySeconds() ?: null);
-        }
+        return $this->dispatchTwoFactorChallengeCode($user, $method);
     }
 
     protected function dispatchTwoFactorChallengeCode(Authenticatable $user, TwoFactorMethod $method): bool
@@ -287,7 +281,13 @@ trait HasTwoFactor
             return false;
         }
 
-        $this->dispatchTwoFactorCode($user, $method, app(Totp::class)->currentCode($secret), 'challenge');
+        $code = app(DeliveredCodes::class)->issue($this->getTwoFactorChallengeSessionKey(), $this->getTwoFactorChallengeTtl());
+
+        if ($code === null) {
+            return false;
+        }
+
+        $this->dispatchTwoFactorCode($user, $method, $code, 'challenge');
 
         return true;
     }

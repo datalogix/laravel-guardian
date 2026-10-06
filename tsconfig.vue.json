@@ -1,0 +1,7 @@
+{
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "jsx": "preserve"
+    },
+    "include": ["src/Framework/Inertia/resources/js/vue/**/*.ts", "src/Framework/Inertia/resources/js/vue/**/*.vue"]
+}

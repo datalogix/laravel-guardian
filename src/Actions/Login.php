@@ -31,7 +31,7 @@ class Login implements HasValidationRules
         $maxAttempts = Guardian::getLoginFeature()->getMaxAttempts();
         $throttleKey = $this->throttleKey(Str::lower($data['login'] ?? ''));
 
-        $this->ensureIsNotRateLimited(
+        $this->reserveAttempt(
             $throttleKey,
             $maxAttempts,
             fn (int $seconds) => throw LoginException::rateLimited($seconds)
@@ -45,14 +45,10 @@ class Login implements HasValidationRules
         $user = $this->timeboxedAttempt($credentials, $guardName);
 
         if (! $user) {
-            $this->hitRateLimiterIfThrottled($throttleKey, $maxAttempts);
-
             throw LoginException::invalid();
         }
 
         if ($user instanceof Model && Guardian::cannotAccess($user)) {
-            $this->hitRateLimiterIfThrottled($throttleKey, $maxAttempts);
-
             throw LoginException::cannotAccess();
         }
 
@@ -109,11 +105,7 @@ class Login implements HasValidationRules
 
     protected function credentialsAreValid(Authenticatable $user, array $credentials): bool
     {
-        try {
-            return Guardian::authProvider()->validateCredentials($user, $credentials);
-        } catch (UnsupportedAuthGuardException) {
-            return false;
-        }
+        return Guardian::authProvider()->validateCredentials($user, $credentials);
     }
 
     protected function rehashPasswordIfRequired(Authenticatable $user, array $credentials): void
