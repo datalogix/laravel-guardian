@@ -1,6 +1,7 @@
 <?php
 
 use Datalogix\Guardian\Fortress;
+use Datalogix\Guardian\FortressRegistry;
 use Datalogix\Guardian\Guardian;
 use Illuminate\Support\Facades\Route;
 
@@ -26,4 +27,6 @@ foreach (Guardian::getFortresses() as $fortress) {
                     ->passwordConfirmationRoutes();
             });
     }
+
+    app(FortressRegistry::class)->claimRoutes($fortress);
 }

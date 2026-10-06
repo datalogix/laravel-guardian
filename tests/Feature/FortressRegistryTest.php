@@ -258,6 +258,8 @@ class FortressRegistryTest extends TestCase
             'provider' => 'ghost_users',
         ]);
 
+        Schema::create('ghost_users', fn ($table) => $table->id());
+
         $registry = new FortressRegistry;
         $registry->register(
             Fortress::make()->id('default')->default()->guard('ghost')->identifierKey(IdentifierKey::CPF)
@@ -280,6 +282,8 @@ class FortressRegistryTest extends TestCase
             'provider' => 'ghost_users',
         ]);
 
+        Schema::create('ghost_users', fn ($table) => $table->id());
+
         $registry = new FortressRegistry;
         $registry->register(
             Fortress::make()->id('default')->default()
@@ -290,6 +294,43 @@ class FortressRegistryTest extends TestCase
 
         $this->expectException(IdentifierColumnConfigurationException::class);
         $this->expectExceptionMessage(IdentifierColumnConfigurationException::missingColumn('default', GhostUser::class, 'login')->getMessage());
+
+        $registry->validate();
+    }
+
+    protected function registryWithGhostUsers(): FortressRegistry
+    {
+        $this->app['config']->set('auth.providers.ghost_users', ['driver' => 'eloquent', 'model' => GhostUser::class]);
+        $this->app['config']->set('auth.guards.ghost', ['driver' => 'session', 'provider' => 'ghost_users']);
+
+        $registry = new FortressRegistry;
+        $registry->register(Fortress::make()->id('default')->default()->guard('ghost')->identifierKey(IdentifierKey::CPF));
+
+        return $registry;
+    }
+
+    public function test_validate_passes_before_the_table_of_the_users_is_migrated(): void
+    {
+        // A fresh install boots the application to run `migrate`, before the table exists.
+        $this->registryWithGhostUsers()->validate();
+
+        $this->assertFalse(Schema::hasTable('ghost_users'));
+    }
+
+    public function test_the_columns_are_not_checked_on_web_requests(): void
+    {
+        Schema::create('ghost_users', fn ($table) => $table->id());
+        $registry = $this->registryWithGhostUsers();
+
+        (fn () => $this->isRunningInConsole = false)->call($this->app);
+
+        try {
+            $registry->validate();
+        } finally {
+            (fn () => $this->isRunningInConsole = true)->call($this->app);
+        }
+
+        $this->expectException(IdentifierColumnConfigurationException::class);
 
         $registry->validate();
     }
@@ -305,9 +346,7 @@ class FortressRegistryTest extends TestCase
     }
 
     /**
-     * A table that HAS the "login" identifier column but no "email" one, to reach
-     * validateIdentifierColumnConfiguration()'s email-specific check rather than
-     * failing earlier on the identifier column itself.
+     * Has the login column but no email column.
      */
     protected function registryForALoginOnlyTable(Closure $configure): FortressRegistry
     {
@@ -497,6 +536,28 @@ class FortressRegistryTest extends TestCase
             }
         };
     }
+
+    public function test_validate_passes_without_a_database_to_check(): void
+    {
+        // A build (`php artisan optimize` in a Docker image) boots without a database.
+        $this->app['config']->set('database.connections.unreachable', [
+            'driver' => 'mysql',
+            'host' => '127.0.0.1',
+            'port' => 1,
+            'database' => 'nowhere',
+            'username' => 'nobody',
+            'password' => '',
+        ]);
+        $this->app['config']->set('auth.providers.unreachable_users', ['driver' => 'eloquent', 'model' => UnreachableUser::class]);
+        $this->app['config']->set('auth.guards.unreachable', ['driver' => 'session', 'provider' => 'unreachable_users']);
+
+        $registry = new FortressRegistry;
+        $registry->register(Fortress::make()->id('default')->default()->guard('unreachable'));
+
+        $registry->validate();
+
+        $this->assertCount(1, $registry->all());
+    }
 }
 
 class GhostUser extends Model
@@ -509,4 +570,11 @@ class LoginOnlyUser extends Model
     protected $table = 'login_only_users';
 
     protected $guarded = [];
+}
+
+class UnreachableUser extends Model
+{
+    protected $connection = 'unreachable';
+
+    protected $table = 'users';
 }

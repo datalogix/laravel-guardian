@@ -5,24 +5,58 @@ namespace Datalogix\Guardian;
 use Datalogix\Guardian\Enums\IdentifierKey;
 use Datalogix\Guardian\Exceptions\EmailVerificationConfigurationException;
 use Datalogix\Guardian\Exceptions\FortressIdException;
+use Datalogix\Guardian\Exceptions\FortressRouteCollisionException;
 use Datalogix\Guardian\Exceptions\IdentifierColumnConfigurationException;
 use Datalogix\Guardian\Exceptions\MultipleDefaultFortressesException;
 use Datalogix\Guardian\Exceptions\NoDefaultFortressSetException;
 use Datalogix\Guardian\Exceptions\NoFortressRegisteredException;
 use Datalogix\Guardian\Exceptions\OAuthConfigurationException;
 use Datalogix\Guardian\Exceptions\OAuthProviderNotConfiguredException;
+use Datalogix\Guardian\Http\Middleware\SetUpFortress;
 use Datalogix\Guardian\Support\Auth\FrameworkVerificationListener;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
+use Throwable;
 
 class FortressRegistry
 {
     protected array $fortress = [];
 
     public ?Fortress $defaultFortress = null;
+
+    /**
+     * @var array<string, string> "METHOD domain/uri" => fortress id
+     */
+    protected array $claimedRoutes = [];
+
+    /**
+     * Laravel silently keeps the last of two identical routes, so a collision must fail here.
+     */
+    public function claimRoutes(Fortress $fortress): void
+    {
+        $marker = SetUpFortress::class.':'.$fortress->getId();
+
+        foreach (Route::getRoutes()->getRoutes() as $route) {
+            if (! in_array($marker, (array) $route->getAction('middleware'), true)) {
+                continue;
+            }
+
+            foreach ($route->methods() as $method) {
+                $key = "{$method} {$route->getDomain()}/".ltrim($route->uri(), '/');
+                $owner = $this->claimedRoutes[$key] ?? $fortress->getId();
+
+                if ($owner !== $fortress->getId()) {
+                    throw FortressRouteCollisionException::make($key, $owner, $fortress->getId());
+                }
+
+                $this->claimedRoutes[$key] = $owner;
+            }
+        }
+    }
 
     public function register(Fortress $fortress): void
     {
@@ -120,8 +154,19 @@ class FortressRegistry
         $this->validateEmailVerificationConfiguration();
         $this->validateOAuthDependencies();
         $this->validateOAuthProviderConfiguration();
-        $this->validateIdentifierColumnConfiguration();
         $this->validateVerificationOfNewUsers();
+
+        if ($this->shouldValidateSchema()) {
+            $this->validateIdentifierColumnConfiguration();
+        }
+    }
+
+    /**
+     * Not on web requests, where it would query the schema every time.
+     */
+    protected function shouldValidateSchema(): bool
+    {
+        return app()->runningInConsole();
     }
 
     protected function validateEmailVerificationConfiguration(): void
@@ -141,10 +186,6 @@ class FortressRegistry
         }
     }
 
-    /**
-     * Only when Laravel itself sends the verification e-mail of new users: Guardian
-     * does not send it for a fortress without the verify route.
-     */
     protected function validateVerificationOfNewUsers(): void
     {
         if (! FrameworkVerificationListener::isRegistered()) {
@@ -207,6 +248,15 @@ class FortressRegistry
             $model = new $modelClass;
             $connection = Schema::connection($model->getConnectionName());
 
+            // Nothing to check before migrating, or without a database (a build).
+            try {
+                if (! $connection->hasTable($model->getTable())) {
+                    continue;
+                }
+            } catch (Throwable) {
+                continue;
+            }
+
             if (! $connection->hasColumn($model->getTable(), $identifierKey->value)) {
                 throw IdentifierColumnConfigurationException::missingColumn($fortress->getId(), $modelClass, $identifierKey->value);
             }
@@ -234,11 +284,11 @@ class FortressRegistry
             $fortress->getFrameworkAdapter();
 
             foreach ($fortress->getFeatures() as $feature) {
-                // Resolving the route action of an enabled feature asks the framework
-                // adapter for its bundled page, which throws when the framework package
-                // is not installed and the feature does not bring its own route action.
+                // Throws when the framework package of a bundled page is missing.
                 $feature->getRouteAction();
             }
+
+            $fortress->getFrameworkAdapter()->validateFortress($fortress);
         }
     }
 }

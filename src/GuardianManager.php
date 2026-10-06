@@ -24,13 +24,6 @@ class GuardianManager
 
     protected bool $isServing = false;
 
-    public function __construct()
-    {
-        if (! app()->resolved(FortressRegistry::class)) {
-            app(FortressRegistry::class);
-        }
-    }
-
     public function registerFortress(Fortress $fortress): void
     {
         app(FortressRegistry::class)->register($fortress);
@@ -96,18 +89,17 @@ class GuardianManager
         $this->currentDomain = $domain;
     }
 
-    public function getCurrentDomain(?string $testingDomain = null): ?string
+    /**
+     * Without a request (queue worker, command) there is no host: the given default is used.
+     */
+    public function getCurrentDomain(?string $default = null): ?string
     {
         if (filled($this->currentDomain)) {
             return $this->currentDomain;
         }
 
-        if (app()->runningUnitTests()) {
-            return $testingDomain;
-        }
-
         if (app()->runningInConsole()) {
-            return 'localhost';
+            return $default;
         }
 
         return request()->getHost();
@@ -124,7 +116,6 @@ class GuardianManager
         event(new FortressBootStarting($fortress));
 
         try {
-            app(FortressRegistry::class)->validate();
             $fortress->boot();
 
             $this->isCurrentFortressBooted = true;

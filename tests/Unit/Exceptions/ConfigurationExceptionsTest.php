@@ -37,7 +37,8 @@ class ConfigurationExceptionsTest extends TestCase
 
     public function test_fortress_id_exception_variants(): void
     {
-        $this->assertStringContainsString('[default]', FortressIdException::alreadyRegistered('default')->getMessage());
+        $this->assertStringContainsString('[default]', FortressIdException::alreadySet('default', 'other')->getMessage());
+        $this->assertStringContainsString('[other]', FortressIdException::alreadySet('default', 'other')->getMessage());
         $this->assertStringContainsString('without an `id()`', FortressIdException::missing()->getMessage());
         $this->assertStringContainsString('[default]', FortressIdException::duplicateInRegistry('default')->getMessage());
         $this->assertStringContainsString('20', FortressIdException::tooLong('a-very-long-id', 20)->getMessage());

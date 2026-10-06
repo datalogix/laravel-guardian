@@ -7,14 +7,11 @@ use Datalogix\Guardian\Framework\Livewire\Commands\CacheComponentsCommand;
 use Datalogix\Guardian\Framework\Livewire\Commands\ClearCachedComponentsCommand;
 use Datalogix\Guardian\Http\Middleware\Authenticate;
 use Datalogix\Guardian\Http\Middleware\DispatchServingGuardianEvent;
+use Datalogix\Guardian\Http\Middleware\EnsureTwoFactorSetupAccess;
 use Datalogix\Guardian\Http\Middleware\SetUpFortress;
 use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 
-/**
- * Wires the Livewire front-end into Guardian: its adapter, views, commands,
- * config and the middleware Livewire must keep on its update requests.
- */
 class LivewireServiceProvider extends ServiceProvider
 {
     public function register(): void
@@ -48,6 +45,8 @@ class LivewireServiceProvider extends ServiceProvider
             Livewire::addPersistentMiddleware([
                 Authenticate::class,
                 DispatchServingGuardianEvent::class,
+                // So a page opened before the session was signed out elsewhere cannot keep acting.
+                EnsureTwoFactorSetupAccess::class,
                 SetUpFortress::class,
             ]);
         }

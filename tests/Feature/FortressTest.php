@@ -9,6 +9,7 @@ use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Framework\Livewire\Layout;
 use Datalogix\Guardian\Tests\Fixtures\User;
 use Datalogix\Guardian\Tests\TestCase;
+use InvalidArgumentException;
 
 class FortressTest extends TestCase
 {
@@ -17,9 +18,51 @@ class FortressTest extends TestCase
         $fortress = Fortress::make()->id('one');
 
         $this->expectException(FortressIdException::class);
-        $this->expectExceptionMessage(FortressIdException::alreadyRegistered('one')->getMessage());
+        $this->expectExceptionMessage(FortressIdException::alreadySet('one', 'two')->getMessage());
 
         $fortress->id('two');
+    }
+
+    public function test_an_id_can_be_given_before_a_preset(): void
+    {
+        $fortress = Fortress::make()->id('panel')->basic();
+
+        $this->assertSame('panel', $fortress->getId());
+        $this->assertFalse($fortress->isDefault());
+    }
+
+    public function test_an_id_given_after_a_preset_replaces_the_one_of_the_preset(): void
+    {
+        $fortress = Fortress::make()->basic()->id('panel');
+
+        $this->assertSame('panel', $fortress->getId());
+        // The default fortress is the one that ends up with the "default" ID.
+        $this->assertFalse($fortress->isDefault());
+    }
+
+    public function test_an_id_before_a_preset_keeps_the_rest_of_the_preset(): void
+    {
+        $fortress = Fortress::make()->id('panel')->admin();
+
+        $this->assertSame('panel', $fortress->getId());
+        $this->assertSame('admin', $fortress->getPath());
+    }
+
+    public function test_the_presets_give_their_ids(): void
+    {
+        $this->assertSame('default', Fortress::make()->basic()->getId());
+        $this->assertTrue(Fortress::make()->basic()->isDefault());
+        $this->assertSame('admin', Fortress::make()->admin()->getId());
+        $this->assertSame('product', Fortress::make()->product()->getId());
+        $this->assertSame('customer', Fortress::make()->basic('customer')->getId());
+    }
+
+    public function test_two_ids_of_its_own_conflict_even_through_a_preset(): void
+    {
+        $this->expectException(FortressIdException::class);
+        $this->expectExceptionMessage(FortressIdException::alreadySet('panel', 'customer')->getMessage());
+
+        Fortress::make()->id('panel')->basic('customer');
     }
 
     public function test_id_cannot_exceed_max_length(): void
@@ -237,5 +280,22 @@ class FortressTest extends TestCase
 
         $this->assertSame('auth.login', $default->generateRouteName('auth.login'));
         $this->assertSame('guardian.secondary.auth.login', $secondary->generateRouteName('auth.login'));
+    }
+
+    public function test_oauth_provider_names_cannot_exceed_the_column_length(): void
+    {
+        $provider = str_repeat('a', Fortress::MAX_OAUTH_PROVIDER_LENGTH + 1);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("OAuth provider [{$provider}] is longer than");
+
+        Fortress::make()->oauth(providers: [$provider]);
+    }
+
+    public function test_oauth_provider_names_up_to_the_column_length_are_accepted(): void
+    {
+        $provider = str_repeat('a', Fortress::MAX_OAUTH_PROVIDER_LENGTH);
+
+        $this->assertSame([$provider], Fortress::make()->oauth(providers: [$provider])->getOAuthProviders());
     }
 }

@@ -2,36 +2,56 @@
 
 namespace Datalogix\Guardian\Tests\Feature;
 
+use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Guardian;
+use Datalogix\Guardian\Tests\Attributes\WithFortresses;
 use Datalogix\Guardian\Tests\TestCase;
-use ReflectionProperty;
 
 class GuardianManagerCurrentDomainTest extends TestCase
 {
-    protected function overrideEnvironmentDetection(bool $runningInConsole): void
+    protected function runningInConsole(bool $runningInConsole): void
     {
-        // Force runningUnitTests() to false so getCurrentDomain() falls through
-        // past its "testing" branch, and pin runningInConsole()'s memoized
-        // value directly (it's cached the first time it's called, which
-        // already happened during this test's own application boot).
-        $this->app->instance('env', 'production');
-
-        $property = new ReflectionProperty($this->app, 'isRunningInConsole');
-        $property->setAccessible(true);
-        $property->setValue($this->app, $runningInConsole);
+        // runningInConsole() is memoized when the application boots.
+        (fn () => $this->isRunningInConsole = $runningInConsole)->call($this->app);
     }
 
-    public function test_it_returns_localhost_when_running_in_console_outside_of_tests(): void
+    public function test_without_a_request_it_is_the_given_default(): void
     {
-        $this->overrideEnvironmentDetection(runningInConsole: true);
+        $this->runningInConsole(true);
 
-        $this->assertSame('localhost', Guardian::getCurrentDomain());
+        $this->assertSame('app.example.com', Guardian::getCurrentDomain('app.example.com'));
+        $this->assertNull(Guardian::getCurrentDomain());
     }
 
-    public function test_it_falls_back_to_the_request_host_outside_of_console_and_tests(): void
+    public function test_with_a_request_it_is_the_host_of_the_request(): void
     {
-        $this->overrideEnvironmentDetection(runningInConsole: false);
+        $this->runningInConsole(false);
 
-        $this->assertSame(request()->getHost(), Guardian::getCurrentDomain());
+        try {
+            $this->assertSame(request()->getHost(), Guardian::getCurrentDomain('app.example.com'));
+        } finally {
+            $this->runningInConsole(true);
+        }
+    }
+
+    public function test_a_domain_set_for_the_request_comes_first(): void
+    {
+        Guardian::setCurrentDomain('www.example.com');
+
+        $this->assertSame('www.example.com', Guardian::getCurrentDomain('app.example.com'));
+    }
+
+    protected function multiDomain(): array
+    {
+        return [Fortress::make()->basic()->domains(['app.example.com', 'www.example.com'])];
+    }
+
+    #[WithFortresses('multiDomain')]
+    public function test_a_queue_worker_builds_the_links_of_the_first_domain(): void
+    {
+        // A worker renders the e-mails, with no request to take the domain from.
+        $this->runningInConsole(true);
+
+        $this->assertStringStartsWith('http://app.example.com/', Guardian::getResetPasswordUrl('token', $this->createUser()));
     }
 }

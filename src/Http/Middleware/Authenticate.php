@@ -12,8 +12,7 @@ class Authenticate extends BaseAuthenticate
         $auth = Guardian::auth();
 
         if (! $auth->check()) {
-            // unauthenticated() always throws (declared @return never on the
-            // base Laravel middleware), so execution never continues past it.
+            // unauthenticated() always throws.
             $this->unauthenticated($request, $guards);
         }
 

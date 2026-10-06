@@ -10,6 +10,8 @@ trait HasMiddleware
 
     protected array $authMiddleware = [];
 
+    protected array $excludedMiddleware = [];
+
     protected array $persistentMiddlewareStack = [];
 
     public function middleware(array $middleware, bool $isPersistent = false): static
@@ -36,6 +38,19 @@ trait HasMiddleware
         return $this;
     }
 
+    /**
+     * Without "web" the pages lose their session and CSRF protection.
+     */
+    public function withoutMiddleware(array $middleware): static
+    {
+        $this->excludedMiddleware = [
+            ...$this->excludedMiddleware,
+            ...$middleware,
+        ];
+
+        return $this;
+    }
+
     public function persistentMiddleware(array $middleware): static
     {
         $this->persistentMiddlewareStack = [
@@ -48,10 +63,15 @@ trait HasMiddleware
 
     public function getMiddleware(): array
     {
-        return [
+        $middleware = array_diff(
+            [...(config('guardian.middleware') ?? ['web']), ...$this->middleware],
+            $this->excludedMiddleware,
+        );
+
+        return array_values(array_unique([
             SetUpFortress::class.":{$this->getId()}",
-            ...$this->middleware,
-        ];
+            ...$middleware,
+        ]));
     }
 
     public function getAuthMiddleware(): array
@@ -59,10 +79,6 @@ trait HasMiddleware
         return $this->authMiddleware;
     }
 
-    /**
-     * The persistent middleware still waiting to be handed to the framework
-     * adapter; reading it empties the stack.
-     */
     public function pullPersistentMiddleware(): array
     {
         $middleware = $this->persistentMiddlewareStack;

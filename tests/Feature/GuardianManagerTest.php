@@ -7,18 +7,15 @@ use Datalogix\Guardian\Events\FortressBootCompleted;
 use Datalogix\Guardian\Events\FortressBootFailed;
 use Datalogix\Guardian\Events\FortressBootStarting;
 use Datalogix\Guardian\Events\ServingGuardian;
-use Datalogix\Guardian\Exceptions\FrameworkConfigurationException;
 use Datalogix\Guardian\Fortress;
-use Datalogix\Guardian\FortressRegistry;
-use Datalogix\Guardian\Framework\FrameworkResolver;
 use Datalogix\Guardian\GuardianManager;
 use Datalogix\Guardian\Http\Responses\LoginResponse;
 use Datalogix\Guardian\Http\Responses\OAuthCompleteRegistrationResponse;
 use Datalogix\Guardian\Http\Responses\TwoFactorChallengeResponse;
 use Datalogix\Guardian\Http\Responses\TwoFactorSetupResponse;
-use Datalogix\Guardian\Tests\Fixtures\Adapters\UninstalledLivewireAdapter;
 use Datalogix\Guardian\Tests\TestCase;
 use Illuminate\Support\Facades\Event;
+use RuntimeException;
 
 class GuardianManagerTest extends TestCase
 {
@@ -142,8 +139,7 @@ class GuardianManagerTest extends TestCase
     {
         $manager = app('guardian');
 
-        // Populates the two-factor/OAuth features' response classes on the current
-        // fortress; `basic()` alone never configures them since it enables neither feature.
+        // basic() alone configures neither feature.
         $manager->twoFactor();
         $manager->oauth();
 
@@ -173,16 +169,17 @@ class GuardianManagerTest extends TestCase
 
     public function test_boot_current_fortress_dispatches_failed_event_and_rethrows(): void
     {
-        app(FrameworkResolver::class)->register(new UninstalledLivewireAdapter);
-        app(FortressRegistry::class)->register(Fortress::make()->livewire()->basic('broken'));
+        app('guardian')->setCurrentFortress(
+            Fortress::make()->basic('broken')->bootUsing(fn () => throw new RuntimeException('the boot failed'))
+        );
 
         Event::fake([FortressBootFailed::class]);
 
         try {
             app('guardian')->bootCurrentFortress();
-            $this->fail('Expected boot to throw because the Livewire package is not installed.');
-        } catch (FrameworkConfigurationException) {
-            // expected
+            $this->fail('Expected the boot to throw.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('the boot failed', $exception->getMessage());
         }
 
         Event::assertDispatched(FortressBootFailed::class);

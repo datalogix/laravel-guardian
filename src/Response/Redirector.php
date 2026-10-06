@@ -13,7 +13,7 @@ class Redirector
     ) {
         return Guardian::getCurrentOrDefaultFortress()
             ->getFrameworkAdapter()
-            ->redirect($path ?? Guardian::getUrl(), $intended, $navigate);
+            ->redirect($path ?? Guardian::getHomeUrl(), $intended, $navigate);
     }
 
     public static function redirectIntended(?string $path = null, bool $navigate = true)

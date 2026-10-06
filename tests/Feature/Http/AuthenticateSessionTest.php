@@ -8,6 +8,7 @@ use Datalogix\Guardian\Actions\ResetPassword;
 use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Http\Middleware\AuthenticateSession;
+use Datalogix\Guardian\Tests\Attributes\WithFortresses;
 use Datalogix\Guardian\Tests\TestCase;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Auth\SessionGuard;
@@ -15,9 +16,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 
-/**
- * Resetting a stolen password signs out whoever signed in with it.
- */
 class AuthenticateSessionTest extends TestCase
 {
     protected function signedInUser()
@@ -102,5 +100,25 @@ class AuthenticateSessionTest extends TestCase
         AuthenticateSession::storePasswordHash($user);
 
         $this->assertSame($user->getAuthPassword(), session('password_hash_legacy'));
+    }
+
+    protected function withTwoFactor(): array
+    {
+        return [Fortress::make()->basic()->twoFactor(rememberOnDevice: true)];
+    }
+
+    #[WithFortresses('withTwoFactor')]
+    public function test_resetting_the_password_signs_the_session_out_of_the_two_factor_setup_too(): void
+    {
+        // The setup route cannot carry the auth middleware: it also serves a user still signing in.
+        $user = $this->signedInUser();
+        Auth::forgetGuards();
+        $this->get(Guardian::getTwoFactorSetupFeature()->getUrl())->assertOk();
+
+        $this->resetThePasswordOf($user);
+        Auth::forgetGuards();
+
+        $this->get(Guardian::getTwoFactorSetupFeature()->getUrl())->assertRedirect(Guardian::getLoginFeature()->getUrl());
+        $this->assertGuest();
     }
 }

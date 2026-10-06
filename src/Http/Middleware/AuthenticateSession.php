@@ -13,10 +13,7 @@ use Illuminate\Session\Middleware\AuthenticateSession as BaseAuthenticateSession
 use Illuminate\Support\Facades\Session;
 
 /**
- * Signs a session out once the password of its user changes, so resetting a
- * stolen password also signs out whoever used it, and likewise once two-factor
- * authentication is enabled. It runs after Authenticate, which makes the guard of
- * the fortress the one the request uses.
+ * Must run after Authenticate, which makes the request use the fortress guard.
  */
 class AuthenticateSession extends BaseAuthenticateSession
 {
@@ -45,21 +42,19 @@ class AuthenticateSession extends BaseAuthenticateSession
 
         $current = static::twoFactorFingerprint($user);
 
-        // Only enabling it signs the other sessions out: disabling it takes the secret
-        // away, which is not a reason to sign out whoever is left.
+        // Only enabling it signs other sessions out.
         if ($current !== null && ! hash_equals($stored, $current)) {
             $this->logout($request);
         }
     }
 
     /**
-     * Stored when the user signs in and when the session itself changes the state,
-     * so that it is only the other sessions that are signed out.
+     * Also stored when this session changes it, so only the other sessions are signed out.
      */
     public static function storeTwoFactorState(Authenticatable $user): void
     {
         if (Guardian::hasAnyTwoFactorFeature()) {
-            // Empty while it is disabled, so that enabling it later still tells.
+            // Empty while disabled, so enabling it later is noticed.
             Session::put(static::twoFactorSessionKey(), static::twoFactorFingerprint($user) ?? '');
         }
     }
@@ -69,10 +64,6 @@ class AuthenticateSession extends BaseAuthenticateSession
         return 'guardian_two_factor_'.Guardian::getGuard();
     }
 
-    /**
-     * Every enabling of two-factor authentication comes with a new secret; null
-     * while it is disabled.
-     */
     protected static function twoFactorFingerprint(Authenticatable $user): ?string
     {
         try {
@@ -85,8 +76,7 @@ class AuthenticateSession extends BaseAuthenticateSession
     }
 
     /**
-     * Stored when the user signs in, not on the next request: a password reset in
-     * between would otherwise be taken as the password of the session.
+     * Stored on sign-in: a password reset before the next request must still sign it out.
      */
     public static function storePasswordHash(Authenticatable $user): void
     {
@@ -99,7 +89,7 @@ class AuthenticateSession extends BaseAuthenticateSession
         try {
             $passwordHash = Guardian::auth()->hashPasswordForCookie($passwordHash);
         } catch (BadMethodCallException) {
-            //
+            // A guard without hashPasswordForCookie() keeps the hash as it is.
         }
 
         Session::put('password_hash_'.Guardian::getGuard(), $passwordHash);

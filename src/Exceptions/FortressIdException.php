@@ -4,9 +4,9 @@ namespace Datalogix\Guardian\Exceptions;
 
 class FortressIdException extends GuardianException
 {
-    public static function alreadyRegistered(string $id): static
+    public static function alreadySet(string $id, string $other): static
     {
-        return new static("The fortress has already been registered with the ID [{$id}].");
+        return new static("The fortress already has the ID [{$id}], so it cannot be given the ID [{$other}].");
     }
 
     public static function missing(): static

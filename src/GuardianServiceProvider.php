@@ -5,10 +5,12 @@ namespace Datalogix\Guardian;
 use Datalogix\Guardian\Framework\FrameworkResolver;
 use Datalogix\Guardian\Framework\Inertia\InertiaServiceProvider;
 use Datalogix\Guardian\Framework\Livewire\LivewireServiceProvider;
+use Datalogix\Guardian\Support\Auth\GuestRedirect;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorUser;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Log\Context\Repository as Context;
 use Illuminate\Support\Facades\Context as ContextFacade;
 use Illuminate\Support\ServiceProvider;
@@ -26,7 +28,6 @@ class GuardianServiceProvider extends ServiceProvider
 
         $this->app->singleton(FrameworkResolver::class);
 
-        // Each front-end brings its own adapter, views, commands and config.
         $this->app->register(LivewireServiceProvider::class);
         $this->app->register(InertiaServiceProvider::class);
     }
@@ -43,6 +44,10 @@ class GuardianServiceProvider extends ServiceProvider
             __DIR__.'/../resources/lang' => $this->app->langPath('vendor/guardian'),
         ], 'guardian-lang');
 
+        $this->publishesMigrations([
+            __DIR__.'/../database/migrations' => database_path('migrations'),
+        ], 'guardian-migrations');
+
         app()->booted(function () {
             app(FortressRegistry::class)->validate();
 
@@ -55,7 +60,12 @@ class GuardianServiceProvider extends ServiceProvider
             $this->scheduleTrustedDevicePruningConditionally($fortresses);
 
             $this->registerNotificationUrlsConditionally($fortresses);
+
+            GuestRedirect::wrap();
         });
+
+        // Laravel sets its destination of guests again whenever the HTTP kernel is made.
+        $this->app->afterResolving(HttpKernel::class, fn () => GuestRedirect::wrap());
 
         $this->carryCurrentFortressToQueuedJobs();
 
@@ -70,6 +80,10 @@ class GuardianServiceProvider extends ServiceProvider
 
     protected function loadMigrationsConditionally(array $fortresses): void
     {
+        if (! (config('guardian.migrations') ?? true)) {
+            return;
+        }
+
         $hasTwoFactor = collect($fortresses)->some(
             fn ($fortress) => $fortress->hasAnyTwoFactorFeature()
         );
@@ -102,10 +116,7 @@ class GuardianServiceProvider extends ServiceProvider
     }
 
     /**
-     * The links in the e-mails are built when the e-mail is rendered, which for a
-     * queued notification happens in a queue worker. So they are registered once
-     * for the whole application instead of by the action that sends the e-mail.
-     * An application that builds its own links keeps them.
+     * Registered globally: queued e-mails render their links in a queue worker.
      */
     protected function registerNotificationUrlsConditionally(array $fortresses): void
     {
@@ -122,10 +133,6 @@ class GuardianServiceProvider extends ServiceProvider
         }
     }
 
-    /**
-     * A job queued by a request of one fortress runs in that fortress, so an
-     * e-mail it renders links to the pages of the fortress that sent it.
-     */
     protected function carryCurrentFortressToQueuedJobs(): void
     {
         ContextFacade::dehydrating(function (Context $context) {
@@ -143,7 +150,7 @@ class GuardianServiceProvider extends ServiceProvider
 
     protected function scheduleTrustedDevicePruningConditionally(array $fortresses): void
     {
-        if (! $this->app->bound(Schedule::class)) {
+        if (! $this->app->bound(Schedule::class) || ! (config('guardian.prune_trusted_devices.enabled') ?? true)) {
             return;
         }
 
