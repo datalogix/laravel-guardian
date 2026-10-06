@@ -15,12 +15,24 @@
 composer require datalogix/laravel-guardian
 ```
 
-Then install the front-end you use, and Socialite if you enable social login:
+Then install the front-end you use, and Socialite if you enable social login.
+
+Livewire front-end (default):
 
 ```bash
-composer require livewire/livewire          # Livewire front-end (default)
-composer require inertiajs/inertia-laravel  # Inertia front-end
-composer require laravel/socialite          # social login
+composer require livewire/livewire
+```
+
+Inertia front-end:
+
+```bash
+composer require inertiajs/inertia-laravel
+```
+
+Social login:
+
+```bash
+composer require laravel/socialite
 ```
 
 The bundled Livewire views use [`datalogix/tallkit`](https://github.com/datalogix/tallkit). Install it, or publish the views and write your own.
@@ -101,9 +113,24 @@ Most options are set per fortress (`twoFactor()`, `oauth()`, `signUp()`...). The
 
 ```bash
 php artisan vendor:publish --tag=guardian-config
+```
+
+Translations:
+
+```bash
 php artisan vendor:publish --tag=guardian-lang
-php artisan vendor:publish --tag=guardian-views        # Livewire views
-php artisan vendor:publish --tag=guardian-migrations   # then set guardian.migrations to false
+```
+
+Livewire views:
+
+```bash
+php artisan vendor:publish --tag=guardian-views
+```
+
+Migrations (then set `guardian.migrations` to `false`):
+
+```bash
+php artisan vendor:publish --tag=guardian-migrations
 ```
 
 ## In production
