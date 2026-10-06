@@ -12,10 +12,6 @@ use Datalogix\Guardian\Tests\TestCase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
-/**
- * Each fortress may have users of its own, with the same IDs or logins as the
- * users of another: their attempts do not count against each other.
- */
 class RateLimitsPerFortressTest extends TestCase
 {
     protected function fortresses(): array

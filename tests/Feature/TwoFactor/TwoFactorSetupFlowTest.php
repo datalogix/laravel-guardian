@@ -192,9 +192,7 @@ class TwoFactorSetupFlowTest extends TestCase
 
     public function test_enable_itself_requires_a_recently_confirmed_password(): void
     {
-        // Exercises EnableTwoFactor's own password-confirmation guard directly,
-        // independent of PrepareTwoFactorSetup (which normally runs first and
-        // would already have thrown for the same reason).
+        // EnableTwoFactor's own guard, without PrepareTwoFactorSetup throwing first.
         $user = $this->createUser();
         $this->actingAs($user);
 
@@ -206,10 +204,7 @@ class TwoFactorSetupFlowTest extends TestCase
 
     public function test_it_throws_when_the_totp_account_label_cannot_be_resolved(): void
     {
-        // Totp::resolveAccountLabel() is only ever called here with its
-        // default $default = 'user' argument, which is never blank on its
-        // own — this failure mode can only come from a Totp implementation
-        // swap (e.g. a custom binding), simulated here via a partial mock.
+        // Only a custom Totp binding can return a blank label: simulated with a partial mock.
         $totp = Mockery::mock(Totp::class)->makePartial();
         $totp->shouldReceive('resolveAccountLabel')->andReturn('');
         $this->app->instance(Totp::class, $totp);

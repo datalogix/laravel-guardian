@@ -19,8 +19,7 @@ class NotifierTest extends TestCase
             }
         });
 
-        // No exception means the tallkit branch executed successfully; there is
-        // no session flash to assert on in that branch, unlike the fallback.
+        // The tallkit branch flashes nothing to assert on.
         Notifier::notify('Hello', 'success');
 
         $this->assertNull(session('status'));

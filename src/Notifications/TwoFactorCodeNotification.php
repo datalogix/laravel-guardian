@@ -10,9 +10,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-/**
- * Queued encrypted, since the payload of the job carries the code.
- */
 class TwoFactorCodeNotification extends Notification implements ShouldBeEncrypted, ShouldQueue
 {
     use HasTwoFactorCodeContext;

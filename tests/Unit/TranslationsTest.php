@@ -7,9 +7,6 @@ use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
-/**
- * The translation files Guardian ships stay complete and keep the placeholders.
- */
 class TranslationsTest extends TestCase
 {
     protected const LANG = __DIR__.'/../../resources/lang';

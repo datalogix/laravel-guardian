@@ -63,8 +63,7 @@ class LivewireComponentsTest extends TestCase
 
     public function test_the_cache_is_ignored_while_running_in_console_even_if_a_file_exists(): void
     {
-        // artisan commands and this test suite always see the components as
-        // they are on disk, never the cached ones.
+        // Artisan and tests always see the components on disk.
         $fortress = Fortress::make()->livewire()->basic('example');
         (new LivewireAdapter)->cacheComponents($fortress);
 

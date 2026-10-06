@@ -54,6 +54,7 @@ class TwoFactorSetupControllerTest extends InertiaTestCase
             'enabled' => false,
             'secret' => null,
             'qrSvg' => null,
+            'canDisable' => false,
             'recoveryCodes' => [],
             'trustedDevices' => [],
             'method' => 'totp',
@@ -176,5 +177,17 @@ class TwoFactorSetupControllerTest extends InertiaTestCase
         $this->signIn();
 
         $this->inertiaDelete('/two-factor/setup/trusted-devices/not-a-number')->assertNotFound();
+    }
+
+    public function test_a_session_signed_out_elsewhere_cannot_use_the_endpoints(): void
+    {
+        $user = $this->signIn();
+        $this->inertiaGet('/two-factor/setup')->assertOk();
+
+        // The password changed elsewhere: the session keeps the hash of the old one.
+        $user->forceFill(['password' => Hash::make('changed-elsewhere')])->save();
+
+        $this->inertiaDelete('/two-factor/setup/trusted-devices')->assertRedirect(url('/login'));
+        $this->assertGuest();
     }
 }

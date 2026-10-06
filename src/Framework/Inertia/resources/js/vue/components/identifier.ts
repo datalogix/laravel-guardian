@@ -17,7 +17,6 @@ const fields: Record<IdentifierKey, IdentifierField> = {
     login: { label: 'Login', type: 'text', autocomplete: 'username', inputmode: 'text' },
 }
 
-/** How the field of the login identifier the fortress uses is labelled and typed. */
 export function identifierField(key: IdentifierKey, t: Translator): IdentifierField {
     const field = fields[key] ?? fields.login
 

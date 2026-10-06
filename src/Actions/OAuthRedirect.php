@@ -14,9 +14,7 @@ class OAuthRedirect
 
     public function __construct(
         protected SocialiteDriverResolver $driverResolver,
-    ) {
-        //
-    }
+    ) {}
 
     public function __invoke(string $provider)
     {

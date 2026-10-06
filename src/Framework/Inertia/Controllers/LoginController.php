@@ -25,9 +25,10 @@ class LoginController extends PageController
 
     public function submit(Request $request)
     {
-        $data = $request->validate(LoginAction::rules());
+        $action = app(LoginAction::class);
+        $data = $request->validate($action::rules());
 
-        $result = app(LoginAction::class)($data, $request->boolean('remember'));
+        $result = $action($data, $request->boolean('remember'));
 
         return $this->respond(
             Guardian::respondToAuthFlow($result, Guardian::getLoginFeature()->getResponse()),

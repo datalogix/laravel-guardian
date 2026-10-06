@@ -6,9 +6,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Guard;
 
 /**
- * A minimal guard that implements the base Guard contract only — no
- * getProvider(), unlike SessionGuard — to exercise HasAuth's
- * UnsupportedAuthGuardException branches for non-StatefulGuard guards.
+ * A guard without getProvider().
  */
 class BareGuard implements Guard
 {
@@ -42,8 +40,5 @@ class BareGuard implements Guard
         return false;
     }
 
-    public function setUser(Authenticatable $user): void
-    {
-        //
-    }
+    public function setUser(Authenticatable $user): void {}
 }

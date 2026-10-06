@@ -24,9 +24,10 @@ class ResetPasswordController extends PageController
 
     public function submit(Request $request)
     {
-        $data = $request->validate(ResetPasswordAction::rules());
+        $action = app(ResetPasswordAction::class);
+        $data = $request->validate($action::rules());
 
-        $status = app(ResetPasswordAction::class)($data);
+        $status = $action($data);
 
         return $this->respond(
             app(Guardian::getResetPasswordFeature()->getResponse(), ['status' => $status]),

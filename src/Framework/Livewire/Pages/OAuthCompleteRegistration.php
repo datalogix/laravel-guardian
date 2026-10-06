@@ -23,9 +23,10 @@ class OAuthCompleteRegistration extends Page
 
     public function submit()
     {
-        $data = $this->validate(CompleteOAuthRegistrationAction::rules());
+        $action = app(CompleteOAuthRegistrationAction::class);
+        $data = $this->validate($action::rules());
 
-        $result = app(CompleteOAuthRegistrationAction::class)($data);
+        $result = $action($data);
 
         return Guardian::respondToAuthFlow($result, Guardian::getOAuthFeature()->getResponse());
     }

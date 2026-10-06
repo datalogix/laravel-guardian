@@ -11,7 +11,5 @@ class FortressBootCompleted
 
     public function __construct(
         public readonly Fortress $fortress,
-    ) {
-        //
-    }
+    ) {}
 }

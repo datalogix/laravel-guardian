@@ -16,9 +16,7 @@ class EnableTwoFactor implements HasValidationRules
 
     public function __construct(
         protected TwoFactorSetupManager $setupManager,
-    ) {
-        //
-    }
+    ) {}
 
     public function __invoke(object $user, array $data = []): array
     {

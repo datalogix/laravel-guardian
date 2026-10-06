@@ -2,9 +2,11 @@
 
 namespace Datalogix\Guardian\Tests\Feature\Actions;
 
+use Datalogix\Guardian\Actions\SendEmailVerificationNotification;
 use Datalogix\Guardian\Actions\SignUp;
 use Datalogix\Guardian\Enums\AuthFlowResult;
 use Datalogix\Guardian\Enums\IdentifierKey;
+use Datalogix\Guardian\Exceptions\EmailVerificationThrottledException;
 use Datalogix\Guardian\Exceptions\SignUpException;
 use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Guardian;
@@ -15,9 +17,11 @@ use Datalogix\Guardian\Tests\Fixtures\User;
 use Datalogix\Guardian\Tests\TestCase;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Validator;
 
 class SignUpActionTest extends TestCase
@@ -138,14 +142,12 @@ class SignUpActionTest extends TestCase
     {
         $maxAttempts = Guardian::getSignUpFeature()->getMaxAttempts();
 
-        // Reuses the same email on every attempt: the first call creates the user,
-        // every later call fails uniqueness, but all of them share the same throttle
-        // key (derived from the submitted `login` value) so attempts accumulate.
+        // The same login every time: the attempts share one throttle key.
         for ($i = 0; $i < $maxAttempts; $i++) {
             try {
                 app(SignUp::class)($this->validData());
             } catch (\Throwable) {
-                // ignore, we only care about the throttle counter here
+                // Only the throttle counter matters here.
             }
         }
 
@@ -160,6 +162,12 @@ class SignUpActionTest extends TestCase
         }
     }
 
+    protected function withTerms(): array
+    {
+        return [Fortress::make()->product()->default()->signUp(termsUrl: 'https://example.com/terms')];
+    }
+
+    #[WithFortresses('withTerms')]
     public function test_rules_require_terms_acceptance_and_unique_email(): void
     {
         $this->createUser(['email' => 'taken@example.com']);
@@ -176,6 +184,21 @@ class SignUpActionTest extends TestCase
         $this->assertArrayHasKey('login', $validator->errors()->toArray());
     }
 
+    public function test_without_terms_to_link_to_none_are_asked_for(): void
+    {
+        $this->assertArrayNotHasKey('terms', SignUp::rules());
+    }
+
+    #[WithFortresses('withTerms')]
+    public function test_the_acceptance_of_the_terms_is_kept_by_a_model_with_the_column(): void
+    {
+        Schema::table('users', fn ($table) => $table->timestamp('terms_accepted_at')->nullable());
+
+        app(SignUp::class)($this->validData(['login' => 'terms@example.com', 'terms' => true]));
+
+        $this->assertNotNull(DB::table('users')->where('email', 'terms@example.com')->value('terms_accepted_at'));
+    }
+
     protected function identifiedByUsername(): array
     {
         return [Fortress::make()->product()->default()->identifierKey(IdentifierKey::Username)];
@@ -188,5 +211,22 @@ class SignUpActionTest extends TestCase
 
         $this->assertArrayHasKey('email', $rules);
         $this->assertArrayHasKey('login', $rules);
+    }
+
+    public function test_signing_up_does_not_fail_when_the_verification_e_mail_is_throttled(): void
+    {
+        // Without Laravel's own listener, Guardian sends the e-mail itself.
+        Event::forget(Registered::class);
+        $this->app->bind(SendEmailVerificationNotification::class, fn () => new class
+        {
+            public function __invoke(): bool
+            {
+                throw new EmailVerificationThrottledException(60);
+            }
+        });
+
+        app(SignUp::class)($this->validData(['login' => 'throttled@example.com']));
+
+        $this->assertDatabaseHas('users', ['email' => 'throttled@example.com']);
     }
 }

@@ -19,6 +19,10 @@ class Cnpj implements ValidationRule
 
     private function isValid(string $value): bool
     {
+        if (preg_match('/[^0-9A-Za-z.\/\-\s]/', $value)) {
+            return false;
+        }
+
         $cnpj = strtoupper((string) preg_replace('/[^0-9A-Za-z]/', '', $value));
 
         if (strlen($cnpj) !== 14 || preg_match('/^(.)\1{13}$/', $cnpj)) {

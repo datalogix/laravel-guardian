@@ -14,7 +14,5 @@ class TwoFactorTrustedDevicesRevokedAll
         public readonly Fortress $fortress,
         public readonly Model $user,
         public readonly int $count = 0,
-    ) {
-        //
-    }
+    ) {}
 }

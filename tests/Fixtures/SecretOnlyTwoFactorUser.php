@@ -7,10 +7,7 @@ use Datalogix\Guardian\Contracts\TwoFactorAuthenticatable;
 use Datalogix\Guardian\Fortress;
 
 /**
- * Manages its two-factor secret via the storage contracts (so it is
- * "enabled"), but implements neither the recovery-code contract nor points at
- * a table with a two_factor_recovery_codes column — canStoreTwoFactorRecoveryCodes()
- * must be false, exercising TwoFactorSetup's "cannot manage recovery codes" branch.
+ * Manages its secret through the contracts, but cannot store recovery codes.
  */
 class SecretOnlyTwoFactorUser extends User implements CanManageTwoFactorAuthentication, TwoFactorAuthenticatable
 {

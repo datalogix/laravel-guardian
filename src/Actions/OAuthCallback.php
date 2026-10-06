@@ -34,9 +34,7 @@ class OAuthCallback
         protected OAuthIdentities $oauthIdentities,
         protected OAuthTokenPayload $oauthTokenPayload,
         protected SocialiteDriverResolver $driverResolver,
-    ) {
-        //
-    }
+    ) {}
 
     public function __invoke(string $provider, bool $remember = true): AuthFlowResult
     {
@@ -105,13 +103,11 @@ class OAuthCallback
         $raw = method_exists($oauthUser, 'getRaw') ? (array) $oauthUser->getRaw() : [];
         $emailVerifiedUsing = Guardian::getOAuthEmailVerifiedUsing();
 
-        // The application knows its providers, so when it says how to decide, it decides.
         if ($emailVerifiedUsing instanceof Closure) {
             return (bool) $emailVerifiedUsing($oauthUser, $raw, $provider);
         }
 
-        // Only the claims that mean "the e-mail is verified" are trusted: a key such as
-        // "verified" means something else (a verified account) for some providers.
+        // "verified" alone means a verified account for some providers, not the e-mail.
         foreach (['email_verified', 'verified_email'] as $key) {
             if (array_key_exists($key, $raw)) {
                 return filter_var($raw[$key], FILTER_VALIDATE_BOOLEAN);
@@ -147,7 +143,7 @@ class OAuthCallback
     {
         $modelClass = Guardian::authModelClass();
 
-        return $modelClass::query()->whereRaw('LOWER(email) = ?', [Str::lower($email)])->first();
+        return $modelClass::query()->where('email', IdentifierKey::Email->normalize($email))->first();
     }
 
     protected function createUserFromOAuth(
@@ -161,12 +157,19 @@ class OAuthCallback
             return null;
         }
 
+        // An unverified e-mail would let anyone pre-register someone else's account.
+        if (! $this->isOAuthEmailVerified($provider, $oauthUser)) {
+            $this->warnAboutIgnoredVerifiedClaim($provider, $oauthUser);
+
+            throw OAuthException::emailNotVerified();
+        }
+
         $modelClass = Guardian::authModelClass();
         $name = $oauthUser->getName() ?: $oauthUser->getNickname() ?: Str::headline($provider).' User';
 
         $attributes = [
             'name' => $name,
-            'email' => $email,
+            'email' => IdentifierKey::Email->normalize($email),
             'password' => Hash::make(Str::random(64)),
         ];
 
@@ -187,10 +190,9 @@ class OAuthCallback
             Guardian::startPendingOAuthRegistration(
                 provider: $provider,
                 providerUserId: $providerUserId,
-                email: $email,
+                email: IdentifierKey::Email->normalize($email),
                 name: $name,
                 avatar: $oauthUser->getAvatar(),
-                emailVerified: $this->isOAuthEmailVerified($provider, $oauthUser),
                 accessToken: $accessToken,
                 refreshToken: $refreshToken,
                 tokenExpiresAt: $tokenExpiresAt,
@@ -209,9 +211,7 @@ class OAuthCallback
             );
         }
 
-        if ($this->hasEmailVerifiedColumn($modelClass) && $this->isOAuthEmailVerified($provider, $oauthUser)) {
-            $attributes['email_verified_at'] = now();
-        }
+        $guardianAttributes = $this->hasEmailVerifiedColumn($modelClass) ? ['email_verified_at' => now()] : [];
 
         $user = $this->createAuthenticatableUser(
             $modelClass,
@@ -219,6 +219,7 @@ class OAuthCallback
             OAuthException::cannotAccess(...),
             fn () => $this->findUserByEmail($email) ? OAuthException::emailAlreadyExists() : OAuthException::unableToAuthenticate(),
             OAuthException::unableToAuthenticate(...),
+            guardianAttributes: $guardianAttributes,
         );
 
         $this->fireUserRegistered($user);
@@ -317,10 +318,6 @@ class OAuthCallback
         return $user;
     }
 
-    /**
-     * A "verified" claim is not trusted on its own, so an application that relied on it
-     * would only see its users being refused: tell it what to configure.
-     */
     protected function warnAboutIgnoredVerifiedClaim(string $provider, ProviderUser $oauthUser): void
     {
         $raw = method_exists($oauthUser, 'getRaw') ? (array) $oauthUser->getRaw() : [];
@@ -330,7 +327,7 @@ class OAuthCallback
         }
 
         logger()->warning(
-            "Guardian did not link the [{$provider}] account to the user with the same e-mail, because the e-mail is not verified. ".
+            "Guardian did not link or create a user for the [{$provider}] account, because its e-mail is not verified. ".
             'The provider sent a [verified] claim, which Guardian does not trust on its own: if it means the e-mail is verified, '.
             'say so with the emailVerifiedUsing option of oauth().'
         );

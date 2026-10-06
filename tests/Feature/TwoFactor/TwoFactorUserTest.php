@@ -118,7 +118,10 @@ class TwoFactorUserTest extends TestCase
 
         $this->assertSame('contract-secret', $this->manager->getTwoFactorSecret($user, $this->fortress()));
         $this->assertTrue($this->manager->hasTwoFactorEnabled($user, $this->fortress()));
-        $this->assertSame(['one', 'two'], $this->manager->getTwoFactorRecoveryCodes($user, $this->fortress()));
+        // The model is given the hashes of the codes, never the codes themselves.
+        $this->assertCount(2, $user->getTwoFactorRecoveryCodes($this->fortress()));
+        $this->assertNotContains('one', $user->getTwoFactorRecoveryCodes($this->fortress()));
+        $this->assertTrue($this->manager->consumeTwoFactorRecoveryCode($user, $this->fortress(), 'one'));
 
         // The contract methods are used directly — the DB column stays empty.
         $this->assertNull(DB::table('users')->where('id', $user->id)->value('two_factor_secret'));

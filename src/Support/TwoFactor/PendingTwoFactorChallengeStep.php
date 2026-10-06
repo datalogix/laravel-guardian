@@ -31,8 +31,6 @@ class PendingTwoFactorChallengeStep implements PendingAuthStep
 
     public function authorize(?Authenticatable $user): void
     {
-        // The pending challenge session itself is the access token for
-        // this step; there is no additional authorization check beyond
-        // existing and resolving to a valid user.
+        // The pending session is the authorization.
     }
 }

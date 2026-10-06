@@ -3,6 +3,7 @@
 namespace Datalogix\Guardian\Actions;
 
 use Datalogix\Guardian\Actions\Concerns\HasRateLimiter;
+use Datalogix\Guardian\Exceptions\EmailVerificationThrottledException;
 use Datalogix\Guardian\Exceptions\GuardianException;
 use Datalogix\Guardian\Guardian;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -34,6 +35,6 @@ class SendEmailVerificationNotification
             $user->sendEmailVerificationNotification();
 
             return true;
-        }, fn () => false, $user->getKey(), Guardian::getEmailVerificationPromptFeature()->getMaxAttempts());
+        }, fn (int $seconds) => throw new EmailVerificationThrottledException($seconds), $user->getKey(), Guardian::getEmailVerificationPromptFeature()->getMaxAttempts());
     }
 }

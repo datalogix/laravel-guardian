@@ -17,10 +17,12 @@ use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorUser;
 use Datalogix\Guardian\Tests\Attributes\WithFortresses;
+use Datalogix\Guardian\Tests\Fixtures\RecordingTimebox;
 use Datalogix\Guardian\Tests\TestCase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Timebox;
 use Illuminate\Validation\ValidationException;
 use PragmaRX\Google2FA\Google2FA;
 
@@ -87,8 +89,7 @@ class TwoFactorChallengeFlowTest extends TestCase
         $this->assertSame(AuthFlowResult::Authenticated, $result);
         Event::assertDispatched(TwoFactorRecoveryCodeUsed::class);
 
-        // Stored recovery codes are hashed at rest and only ever shown raw once,
-        // right after generation, so the remaining count is checked instead.
+        // Codes are hashed at rest, so the remaining count is checked.
         $remainingCount = app(TwoFactorUser::class)->getTwoFactorRecoveryCodesCount($user->fresh(), Guardian::getCurrentOrDefaultFortress());
         $this->assertSame(7, $remainingCount);
     }
@@ -122,6 +123,23 @@ class TwoFactorChallengeFlowTest extends TestCase
         } finally {
             Event::assertDispatched(TwoFactorChallengeFailed::class);
         }
+    }
+
+    public function test_only_a_correct_code_answers_before_the_timebox_ends(): void
+    {
+        [$user, $secret] = $this->createUserWithTwoFactor();
+        app(Login::class)(['login' => $user->email, 'password' => 'secret123']);
+        $this->app->instance(Timebox::class, $timebox = new RecordingTimebox);
+
+        try {
+            app(ConfirmTwoFactorChallenge::class)(['code' => '000000']);
+        } catch (TwoFactorChallengeException) {
+            // expected
+        }
+
+        app(ConfirmTwoFactorChallenge::class)(['code' => app(Google2FA::class)->getCurrentOtp($secret)]);
+
+        $this->assertSame([false, true], $timebox->returnedEarly);
     }
 
     public function test_confirming_without_a_pending_challenge_throws(): void
@@ -263,8 +281,7 @@ class TwoFactorChallengeFlowTest extends TestCase
 
         app(Login::class)(['login' => $user->email, 'password' => 'secret123']);
 
-        // The pending challenge session still records "email" as its method,
-        // but the secret backing it is now gone.
+        // The challenge still says "email", but the secret is gone.
         app(TwoFactorUser::class)->saveTwoFactorSecret($user->fresh(), Guardian::getCurrentOrDefaultFortress(), null);
 
         Notification::fake();

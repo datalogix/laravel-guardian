@@ -55,10 +55,6 @@ class InertiaAdapter extends AbstractFrameworkAdapter
         ];
     }
 
-    /**
-     * The Inertia page component rendered for a bundled page, e.g. "Guardian/Login":
-     * the one the fortress names in ->inertia(pages: [...]) or else "{prefix}/{Page}".
-     */
     public static function component(string $page, ?Fortress $fortress = null): string
     {
         $pages = $fortress?->getFrameworkOption('pages', []) ?? [];
@@ -71,12 +67,11 @@ class InertiaAdapter extends AbstractFrameworkAdapter
     {
         $controller = $feature->getRouteAction();
 
-        // A custom route action owns its endpoints; only the bundled controllers are wired here.
         if (! is_string($controller) || ! is_subclass_of($controller, PageController::class)) {
             return;
         }
 
-        // "signed" protects the link that opens the page (e.g. from an e-mail), not the endpoints it posts to.
+        // "signed" protects the link that opens the page, not the endpoints it posts to.
         $middleware = array_values(array_diff(array_filter(Arr::wrap($middleware)), ['signed']));
 
         foreach ($controller::endpoints() as $name => $endpoint) {

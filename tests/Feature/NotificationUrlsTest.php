@@ -17,9 +17,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 
 /**
- * The links of the password reset and e-mail verification e-mails are built when
- * the e-mail is rendered, which for a queued notification happens in a queue
- * worker: a new process that never ran the action that sent the e-mail.
+ * Queued e-mails build their links in a queue worker.
  */
 class NotificationUrlsTest extends TestCase
 {
@@ -45,8 +43,7 @@ class NotificationUrlsTest extends TestCase
     }
 
     /**
-     * Renders the e-mail the way a queue worker does: in a newly booted application,
-     * with the context the job carried.
+     * Renders like a queue worker: in a new application, with the context the job carried.
      */
     protected function renderedByAQueueWorker(object $notification, object $notifiable, ?array $context): Request
     {

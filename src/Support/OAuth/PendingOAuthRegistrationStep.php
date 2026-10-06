@@ -30,7 +30,6 @@ class PendingOAuthRegistrationStep implements PendingAuthStep
 
     public function authorize(?Authenticatable $user): void
     {
-        // The pending registration session itself is the access token for
-        // this step; there is no user yet to authorize against.
+        // The pending session is the authorization: there is no user yet.
     }
 }

@@ -7,7 +7,6 @@ use Datalogix\Guardian\Exceptions\PasswordConfirmationException;
 use Datalogix\Guardian\Guardian;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Timebox;
-use Illuminate\Validation\Rules\Password as PasswordRule;
 
 class ConfirmPassword implements HasValidationRules
 {
@@ -52,7 +51,10 @@ class ConfirmPassword implements HasValidationRules
         return app(Timebox::class)->call(function ($timebox) use ($auth, $credentials) {
             $valid = $auth->validate($credentials);
 
-            $timebox->returnEarly();
+            // Only a correct password returns early, so timing does not reveal a wrong one.
+            if ($valid) {
+                $timebox->returnEarly();
+            }
 
             return $valid;
         }, config('auth.timebox_duration', 200000));
@@ -61,7 +63,8 @@ class ConfirmPassword implements HasValidationRules
     public static function rules(): array
     {
         return [
-            'password' => ['required', 'string', PasswordRule::default()],
+            // Not the rules of a new password: a stricter policy must not lock users out.
+            'password' => ['required', 'string'],
         ];
     }
 }

@@ -12,10 +12,6 @@ use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 
-/**
- * The state of the setup page is the server's: everything the page shows is
- * read-only for the browser, apart from the code the user types.
- */
 #[Group('livewire')]
 class TwoFactorSetupLockedPropertiesTest extends TestCase
 {

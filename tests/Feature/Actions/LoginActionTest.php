@@ -142,9 +142,7 @@ class LoginActionTest extends TestCase
         $fortress = Fortress::make()->basic('bare-fortress')->guard('bare');
         Guardian::setCurrentFortress($fortress);
 
-        // Login::retrieveUser() catches UnsupportedAuthGuardException and
-        // behaves as "no match", surfacing the same LoginException as invalid
-        // credentials would.
+        // retrieveUser() turns the exception into "no match".
         $this->expectException(LoginException::class);
         $this->expectExceptionMessage(LoginException::invalid()->getMessage());
 

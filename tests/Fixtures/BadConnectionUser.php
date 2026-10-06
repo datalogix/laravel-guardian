@@ -3,9 +3,7 @@
 namespace Datalogix\Guardian\Tests\Fixtures;
 
 /**
- * Points at a database connection that isn't configured, to force
- * TwoFactorUser::hasColumn()'s catch(Throwable) branch when Schema inspection
- * itself fails, instead of merely finding no matching column.
+ * Points at an unconfigured connection, so schema inspection throws.
  */
 class BadConnectionUser extends User
 {

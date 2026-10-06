@@ -26,9 +26,10 @@ class Login extends Page
     public function submit()
     {
         return $this->forgettingSecrets(function () {
-            $data = $this->validate(LoginAction::rules());
+            $action = app(LoginAction::class);
+            $data = $this->validate($action::rules());
 
-            $result = app(LoginAction::class)($data, $this->remember);
+            $result = $action($data, $this->remember);
 
             return Guardian::respondToAuthFlow($result, Guardian::getLoginFeature()->getResponse());
         }, 'password');

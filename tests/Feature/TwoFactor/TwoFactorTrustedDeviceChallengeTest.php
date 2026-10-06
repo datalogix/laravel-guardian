@@ -70,7 +70,6 @@ class TwoFactorTrustedDeviceChallengeTest extends TestCase
         $this->app['auth']->guard()->logout();
         session()->flush();
 
-        // With no cookie on the request, the challenge is required again.
         $this->assertSame(
             AuthFlowResult::ChallengeRequired,
             app(Login::class)(['login' => $user->email, 'password' => 'secret123'])

@@ -43,8 +43,7 @@ class TwoFactorNotificationsTest extends TestCase
 
     public function test_sms_notification_returns_null_when_vonage_channel_is_unavailable(): void
     {
-        // This project doesn't depend on a Vonage notification channel package,
-        // so `VonageMessage` never exists — toVonage() must degrade gracefully.
+        // VonageMessage does not exist here: toVonage() must degrade gracefully.
         $notification = new TwoFactorSmsCodeNotification('123456', 'challenge');
 
         $this->assertNull($notification->toVonage($this->createUser()));

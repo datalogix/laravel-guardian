@@ -2,15 +2,6 @@
 
 namespace Datalogix\Guardian\Framework\Inertia;
 
-/**
- * The lines of the bundled pages in the language of the request, keyed by their
- * English text, for the t() helper of the pages.
- *
- * The lines are the ones the pages show (resources/lines.json), translated with
- * __(), so an application that translates them in its own lang files, or adds a
- * language, is followed too. A line that stays the same is left out, since the
- * page shows the English text when it has no translation.
- */
 class PageTranslations
 {
     /**

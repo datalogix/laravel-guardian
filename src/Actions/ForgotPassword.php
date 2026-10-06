@@ -11,7 +11,6 @@ use Illuminate\Auth\Events\PasswordResetLinkSent;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Str;
 use Illuminate\Support\Timebox;
 
 class ForgotPassword implements HasValidationRules
@@ -19,14 +18,8 @@ class ForgotPassword implements HasValidationRules
     use HasRateLimiter;
     use RemapsLoginField;
 
-    /**
-     * What the visitor is told, whether or not an account exists for the login.
-     */
     public const GENERIC_STATUS = 'If an account exists for that login, we have emailed a password reset link.';
 
-    /**
-     * An IP may ask for as many links as this many times the limit of a single login.
-     */
     public const IP_ATTEMPTS_MULTIPLIER = 10;
 
     public function __invoke(array $data = [])
@@ -35,13 +28,12 @@ class ForgotPassword implements HasValidationRules
         $maxAttempts = Guardian::getForgotPasswordFeature()->getMaxAttempts();
         $onLockout = fn (int $seconds) => throw ResetPasswordException::rateLimited($seconds);
 
-        // The limit of a login alone does not stop someone from trying a different
-        // login on every request, so the IP is limited as well.
+        // Limited per login and per IP, so cycling logins does not get around it.
         return $this->throttleAction(
             fn () => $this->throttleAction(
                 fn () => $this->sendResetLink($credentials),
                 $onLockout,
-                Str::lower($data['login'] ?? ''),
+                (string) Guardian::getIdentifierKey()->normalize($data['login'] ?? ''),
                 $maxAttempts,
             ),
             $onLockout,
@@ -55,8 +47,7 @@ class ForgotPassword implements HasValidationRules
             return $this->requestResetLink($credentials);
         }
 
-        // Only an account that exists costs the time to create the token and to
-        // send the message, so every answer takes the same time.
+        // Same duration whether or not the account exists.
         return app(Timebox::class)->call(function () use ($credentials) {
             $this->requestResetLink($credentials);
 

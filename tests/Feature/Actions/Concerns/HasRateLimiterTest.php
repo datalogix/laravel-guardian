@@ -6,6 +6,8 @@ use Datalogix\Guardian\Actions\Concerns\HasRateLimiter;
 use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Tests\TestCase;
+use Illuminate\Cache\RateLimiter as CacheRateLimiter;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 
 class HasRateLimiterTest extends TestCase
@@ -69,8 +71,7 @@ class HasRateLimiterTest extends TestCase
 
     public function test_attempts_sent_at_the_same_time_are_held_to_the_limit(): void
     {
-        // Every attempt is under way before any of them has finished, as when they
-        // are sent at the same time: none of them may slip past the limit.
+        // All attempts start before any finishes, like concurrent requests.
         $harness = $this->harness();
         $underWay = 0;
 
@@ -201,5 +202,26 @@ class HasRateLimiterTest extends TestCase
 
         $this->assertSame($key(Fortress::make()->basic('one')), $key(Fortress::make()->basic('one')));
         $this->assertNotSame($key(Fortress::make()->basic('one')), $key(Fortress::make()->basic('two')));
+    }
+
+    public function test_the_attempts_are_counted_on_the_configured_cache_store(): void
+    {
+        config([
+            'cache.stores.guardian' => ['driver' => 'array'],
+            'guardian.cache_store' => 'guardian',
+        ]);
+
+        $harness = $this->harness();
+
+        $harness->reserve('key', 1, fn () => null);
+
+        $this->assertSame(1, (new CacheRateLimiter(Cache::store('guardian')))->attempts('key'));
+        $this->assertSame(0, RateLimiter::attempts('key'));
+
+        $this->assertSame('locked', $harness->reserve('key', 1, fn () => 'locked'));
+
+        $harness->clear('key', 1);
+
+        $this->assertSame(0, (new CacheRateLimiter(Cache::store('guardian')))->attempts('key'));
     }
 }

@@ -46,9 +46,7 @@ class MultiFortressTest extends TestCase
 
     public function test_fortresses_sharing_the_same_guard_share_authentication_state(): void
     {
-        // basic() and admin() both default to the "web" guard, so a session
-        // authenticated under the default fortress is also seen as authenticated
-        // when browsing under the admin fortress's path.
+        // Both fortresses use the "web" guard, so the session is shared.
         $user = $this->createUser(['password' => Hash::make('secret123')]);
         $this->actingAs($user);
 

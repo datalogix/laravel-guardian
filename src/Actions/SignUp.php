@@ -3,6 +3,7 @@
 namespace Datalogix\Guardian\Actions;
 
 use Datalogix\Guardian\Actions\Concerns\CreatesAuthenticatableUser;
+use Datalogix\Guardian\Actions\Concerns\HasEmailVerifiedColumn;
 use Datalogix\Guardian\Actions\Concerns\HasRateLimiter;
 use Datalogix\Guardian\Actions\Concerns\RemapsLoginField;
 use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
@@ -13,36 +14,37 @@ use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\Auth\PostAuthenticationFlow;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 class SignUp implements HasValidationRules
 {
     use CreatesAuthenticatableUser;
+    use HasEmailVerifiedColumn;
     use HasRateLimiter;
     use RemapsLoginField;
 
     public function __construct(
         protected PostAuthenticationFlow $postAuthenticationFlow,
-    ) {
-        //
-    }
+    ) {}
 
     public function __invoke(array $data = [], bool $remember = false): AuthFlowResult
     {
         return $this->throttleAction(
             function () use ($data, $remember) {
                 $modelClass = Guardian::authModelClass();
-                // Only the fields of the form reach the model, whatever the caller passes
-                // along: a model with $guarded = [] would otherwise take any of them.
+                // Only the form's fields: a model with $guarded = [] would accept anything.
                 $data = Arr::only($data, array_keys(static::rules()));
                 $attributes = $this->remapLoginField(Arr::except($data, ['password_confirmation', 'terms']));
 
-                // Hashed here, not left to the model: a model without the "hashed"
-                // cast would otherwise store the password as it was typed.
+                // Hashed here: the model may lack the "hashed" cast.
                 if (is_string($attributes['password'] ?? null)) {
                     $attributes['password'] = Hash::make($attributes['password']);
+                }
+
+                $guardianAttributes = [];
+
+                if (Guardian::getSignUpTermsUrl() !== null && $this->hasModelColumn($modelClass, 'terms_accepted_at')) {
+                    $guardianAttributes['terms_accepted_at'] = now();
                 }
 
                 $user = $this->createAuthenticatableUser(
@@ -51,6 +53,7 @@ class SignUp implements HasValidationRules
                     SignUpException::cannotAccess(...),
                     SignUpException::emailAlreadyExists(...),
                     SignUpException::unableToRegister(...),
+                    guardianAttributes: $guardianAttributes,
                 );
 
                 $this->fireUserRegistered($user);
@@ -58,7 +61,7 @@ class SignUp implements HasValidationRules
                 return $this->postAuthenticationFlow->handle($user, $remember);
             },
             fn (int $seconds) => throw SignUpException::rateLimited($seconds),
-            Str::lower($data['login'] ?? ''),
+            (string) Guardian::getIdentifierKey()->normalize($data['login'] ?? ''),
             Guardian::getSignUpFeature()->getMaxAttempts()
         );
     }
@@ -70,14 +73,17 @@ class SignUp implements HasValidationRules
 
         $rules = [
             'name' => ['required', 'string', 'max:255'],
-            'login' => $identifierKey->rules([Rule::unique($modelClass, $identifierKey->value)]),
+            'login' => $identifierKey->rules([$identifierKey->unique($modelClass)]),
             'password' => ['required', 'string', Password::default(), 'confirmed'],
             'password_confirmation' => ['required', 'string', Password::default()],
-            'terms' => ['required', 'accepted'],
         ];
 
+        if (Guardian::getSignUpTermsUrl() !== null) {
+            $rules['terms'] = ['required', 'accepted'];
+        }
+
         if ($identifierKey !== IdentifierKey::Email) {
-            $rules += ['email' => ['required', 'string', 'email', 'max:255', Rule::unique($modelClass, 'email')]];
+            $rules += ['email' => ['required', 'string', 'email', 'max:255', IdentifierKey::Email->unique($modelClass)]];
         }
 
         return $rules;

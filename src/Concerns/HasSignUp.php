@@ -10,6 +10,8 @@ trait HasSignUp
 {
     protected ?SignUpFeature $signUpFeature = null;
 
+    protected string|Closure|null $signUpTermsUrl = null;
+
     public function getSignUpFeature(): SignUpFeature
     {
         return $this->signUpFeature ??= new SignUpFeature($this);
@@ -22,6 +24,7 @@ trait HasSignUp
         string|Closure|null $response = null,
         int|false|null $maxAttempts = null,
         BackedEnum|string|null $layout = null,
+        string|Closure|null $termsUrl = null,
     ): static {
         $this->getSignUpFeature()->configure(
             $routeAction,
@@ -32,7 +35,16 @@ trait HasSignUp
             $layout,
         );
 
+        $this->signUpTermsUrl = $termsUrl;
+
         return $this;
+    }
+
+    public function getSignUpTermsUrl(): ?string
+    {
+        $url = value($this->signUpTermsUrl);
+
+        return filled($url) ? $url : null;
     }
 
     public function signUpRoutes(): static

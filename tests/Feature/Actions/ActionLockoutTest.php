@@ -4,7 +4,6 @@ namespace Datalogix\Guardian\Tests\Feature\Actions;
 
 use Datalogix\Guardian\Actions\CompleteOAuthRegistration;
 use Datalogix\Guardian\Actions\DisableTwoFactor;
-use Datalogix\Guardian\Actions\DisconnectOAuthIdentity;
 use Datalogix\Guardian\Actions\EnableTwoFactor;
 use Datalogix\Guardian\Actions\ForgotPassword;
 use Datalogix\Guardian\Actions\PrepareTwoFactorSetup;
@@ -13,6 +12,7 @@ use Datalogix\Guardian\Actions\ResetPassword;
 use Datalogix\Guardian\Actions\SendEmailVerificationNotification;
 use Datalogix\Guardian\Enums\IdentifierKey;
 use Datalogix\Guardian\Enums\TwoFactorMethod;
+use Datalogix\Guardian\Exceptions\EmailVerificationThrottledException;
 use Datalogix\Guardian\Exceptions\OAuthException;
 use Datalogix\Guardian\Exceptions\ResetPasswordException;
 use Datalogix\Guardian\Exceptions\TwoFactorChallengeException;
@@ -28,10 +28,6 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\Group;
 
-/**
- * Every rate-limited action refuses to run once its limit is reached, with the
- * error of its own form. The limiter itself is covered by HasRateLimiterTest.
- */
 class ActionLockoutTest extends TestCase
 {
     protected function fortresses(): array
@@ -145,16 +141,6 @@ class ActionLockoutTest extends TestCase
     }
 
     #[Group('socialite')]
-    #[WithFortresses('withOAuth')]
-    public function test_disconnect_oauth_identity(): void
-    {
-        $user = $this->signInWithConfirmedPassword();
-        $this->reachTheLimit();
-
-        $this->assertLockedOut(OAuthException::class, fn () => app(DisconnectOAuthIdentity::class)($user, 'github'));
-    }
-
-    #[Group('socialite')]
     #[WithFortresses('identifiedByCpf')]
     public function test_complete_oauth_registration(): void
     {
@@ -170,13 +156,19 @@ class ActionLockoutTest extends TestCase
         $this->assertLockedOut(OAuthException::class, fn () => app(CompleteOAuthRegistration::class)(['login' => '529.982.247-25']));
     }
 
-    public function test_send_email_verification_notification_quietly_sends_nothing(): void
+    public function test_send_email_verification_notification_tells_how_long_to_wait(): void
     {
         Notification::fake();
         $user = $this->createUser(['email_verified_at' => null]);
         $this->reachTheLimit();
 
-        $this->assertFalse(app(SendEmailVerificationNotification::class)($user));
+        try {
+            app(SendEmailVerificationNotification::class)($user);
+            $this->fail('The verification e-mail was not throttled.');
+        } catch (EmailVerificationThrottledException $exception) {
+            $this->assertSame(42, $exception->seconds);
+        }
+
         Notification::assertNothingSent();
         Event::assertDispatched(Lockout::class);
     }

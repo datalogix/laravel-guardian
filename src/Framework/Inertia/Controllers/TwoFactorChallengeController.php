@@ -42,9 +42,10 @@ class TwoFactorChallengeController extends PageController
 
     public function submit(Request $request)
     {
-        $data = $request->validate(ConfirmTwoFactorChallengeAction::rules());
+        $action = app(ConfirmTwoFactorChallengeAction::class);
+        $data = $request->validate($action::rules());
 
-        $result = app(ConfirmTwoFactorChallengeAction::class)($data);
+        $result = $action($data);
 
         return $this->respond(
             Guardian::respondToAuthFlow($result, Guardian::getLoginFeature()->getResponse()),

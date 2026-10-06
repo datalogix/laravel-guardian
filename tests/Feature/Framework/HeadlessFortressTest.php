@@ -12,10 +12,6 @@ use Datalogix\Guardian\Tests\Fixtures\Adapters\UninstalledInertiaAdapter;
 use Datalogix\Guardian\Tests\Fixtures\Adapters\UninstalledLivewireAdapter;
 use Datalogix\Guardian\Tests\TestCase;
 
-/**
- * Neither Livewire nor Inertia is available: the app brings its own pages
- * and only uses Guardian for the actions, routes and responses.
- */
 class HeadlessFortressTest extends TestCase
 {
     protected function getEnvironmentSetUp($app): void

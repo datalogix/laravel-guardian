@@ -4,12 +4,13 @@ namespace Datalogix\Guardian\Actions\Concerns;
 
 use Closure;
 use Datalogix\Guardian\Actions\SendEmailVerificationNotification;
+use Datalogix\Guardian\Exceptions\EmailVerificationThrottledException;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\Auth\FrameworkVerificationListener;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Database\Eloquent\MassAssignmentException;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 trait CreatesAuthenticatableUser
 {
@@ -19,10 +20,12 @@ trait CreatesAuthenticatableUser
         Closure $cannotAccessException,
         Closure $queryExceptionHandler,
         Closure $massAssignmentExceptionHandler,
+        array $guardianAttributes = [],
     ): Model {
         try {
-            return Guardian::wrapInDatabaseTransaction(function () use ($modelClass, $attributes, $cannotAccessException) {
-                $user = new $modelClass($attributes);
+            return Guardian::wrapInDatabaseTransaction(function () use ($modelClass, $attributes, $guardianAttributes, $cannotAccessException) {
+                // forceFill: Laravel's default $fillable would silently drop what Guardian sets itself.
+                $user = (new $modelClass($attributes))->forceFill($guardianAttributes);
 
                 if (Guardian::cannotAccess($user)) {
                     throw $cannotAccessException();
@@ -32,12 +35,8 @@ trait CreatesAuthenticatableUser
 
                 return $user;
             });
-        } catch (QueryException $exception) {
+        } catch (UniqueConstraintViolationException $exception) {
             report($exception);
-
-            if ($exception->getCode() !== '23000') {
-                throw $exception;
-            }
 
             throw $queryExceptionHandler($exception);
         } catch (MassAssignmentException $exception) {
@@ -53,7 +52,11 @@ trait CreatesAuthenticatableUser
 
         // Otherwise the user would get the verification e-mail twice.
         if (! FrameworkVerificationListener::isRegistered()) {
-            app(SendEmailVerificationNotification::class)($user);
+            try {
+                app(SendEmailVerificationNotification::class)($user);
+            } catch (EmailVerificationThrottledException) {
+                // The user can ask for it again from the prompt.
+            }
         }
     }
 }

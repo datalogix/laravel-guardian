@@ -7,9 +7,7 @@ class TwoFactorChallengeVerificationResult
     public function __construct(
         protected bool $valid,
         protected bool $usedRecoveryCode,
-    ) {
-        //
-    }
+    ) {}
 
     public static function invalid(): self
     {

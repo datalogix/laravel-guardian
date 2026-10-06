@@ -45,12 +45,16 @@ class IdentifierKeyTest extends TestCase
         $this->assertFalse($validator->fails());
     }
 
-    public function test_username_rules_enforce_lowercase_alpha_numeric(): void
+    public function test_username_rules_enforce_alpha_numeric(): void
     {
         $validator = Validator::make(['login' => 'Not_Valid!'], ['login' => IdentifierKey::Username->rules()]);
         $this->assertTrue($validator->fails());
 
         $validator = Validator::make(['login' => 'validuser1'], ['login' => IdentifierKey::Username->rules()]);
+        $this->assertFalse($validator->fails());
+
+        // Capitals are fine: the username is normalized to lower case.
+        $validator = Validator::make(['login' => 'ValidUser1'], ['login' => IdentifierKey::Username->rules()]);
         $this->assertFalse($validator->fails());
     }
 

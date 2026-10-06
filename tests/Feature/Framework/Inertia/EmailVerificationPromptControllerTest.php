@@ -2,6 +2,7 @@
 
 namespace Datalogix\Guardian\Tests\Feature\Framework\Inertia;
 
+use Datalogix\Guardian\Guardian;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\Group;
@@ -38,5 +39,19 @@ class EmailVerificationPromptControllerTest extends InertiaTestCase
             ->assertSessionHas('status');
 
         Notification::assertSentTo($user, VerifyEmail::class);
+    }
+
+    public function test_asking_again_too_soon_tells_how_long_to_wait(): void
+    {
+        Notification::fake();
+        $this->actingAs($this->createUser(['email_verified_at' => null]));
+        $limit = Guardian::getEmailVerificationPromptFeature()->getMaxAttempts();
+
+        for ($i = 0; $i < $limit; $i++) {
+            $this->from('/email-verification/prompt')->inertiaPost('/email-verification/prompt');
+        }
+
+        $this->from('/email-verification/prompt')->inertiaPost('/email-verification/prompt')
+            ->assertSessionHas('status', fn (string $status) => str_starts_with($status, 'Too many attempts. Please try again in '));
     }
 }

@@ -21,33 +21,12 @@ trait HasDatabaseTransactions
         return (bool) value($this->hasDatabaseTransactions);
     }
 
-    public function beginDatabaseTransaction(): void
-    {
-        if ($this->hasDatabaseTransactions()) {
-            DB::beginTransaction();
-        }
-    }
-
-    public function commitDatabaseTransaction(): void
-    {
-        if ($this->hasDatabaseTransactions()) {
-            DB::commit();
-        }
-    }
-
-    public function rollBackDatabaseTransaction(): void
-    {
-        if ($this->hasDatabaseTransactions()) {
-            DB::rollBack();
-        }
-    }
-
     public function wrapInDatabaseTransaction(Closure $callback): mixed
     {
         if (! $this->hasDatabaseTransactions()) {
             return $callback();
         }
 
-        return DB::transaction($callback);
+        return DB::connection((new ($this->authModelClass()))->getConnectionName())->transaction($callback);
     }
 }

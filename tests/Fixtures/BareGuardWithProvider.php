@@ -7,9 +7,7 @@ use Illuminate\Contracts\Auth\Guard;
 use Illuminate\Contracts\Auth\UserProvider;
 
 /**
- * A guard that does implement getProvider() (unlike BareGuard), but whose
- * provider has no getModel() — exercises HasAuth::authModelClass()'s own
- * UnsupportedAuthGuardException branch specifically (not authWithProvider()'s).
+ * A guard whose provider has no getModel().
  */
 class BareGuardWithProvider implements Guard
 {
@@ -48,8 +46,5 @@ class BareGuardWithProvider implements Guard
         return false;
     }
 
-    public function setUser(Authenticatable $user): void
-    {
-        //
-    }
+    public function setUser(Authenticatable $user): void {}
 }

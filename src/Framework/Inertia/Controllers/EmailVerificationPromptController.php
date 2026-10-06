@@ -3,6 +3,7 @@
 namespace Datalogix\Guardian\Framework\Inertia\Controllers;
 
 use Datalogix\Guardian\Actions\SendEmailVerificationNotification;
+use Datalogix\Guardian\Exceptions\EmailVerificationThrottledException;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Response\Redirector;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -35,10 +36,15 @@ class EmailVerificationPromptController extends PageController
 
     public function submit(Request $request)
     {
-        $sent = app(SendEmailVerificationNotification::class)(Guardian::user());
+        try {
+            $sent = app(SendEmailVerificationNotification::class)(Guardian::user());
+            $parameters = ['sent' => $sent];
+        } catch (EmailVerificationThrottledException $exception) {
+            $parameters = ['sent' => false, 'retryAfter' => $exception->seconds];
+        }
 
         return $this->respond(
-            app(Guardian::getEmailVerificationPromptFeature()->getResponse(), ['sent' => $sent]),
+            app(Guardian::getEmailVerificationPromptFeature()->getResponse(), $parameters),
             $request,
         );
     }

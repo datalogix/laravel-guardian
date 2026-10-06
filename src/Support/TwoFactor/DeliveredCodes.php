@@ -3,13 +3,12 @@
 namespace Datalogix\Guardian\Support\TwoFactor;
 
 use Datalogix\Guardian\Support\SessionState;
+use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * The codes sent by e-mail or SMS. Every delivery is a random code of its own, of
- * which the session of the step keeps a keyed hash: it is accepted once, for the
- * TTL of the step, and a few wrong guesses throw it away, so it cannot be worked
- * out one attempt at a time. Only the code last sent is valid.
+ * Codes sent by e-mail or SMS: only a keyed hash is kept, each is accepted once,
+ * and a few wrong guesses discard it.
  */
 class DeliveredCodes
 {
@@ -19,14 +18,8 @@ class DeliveredCodes
 
     public function __construct(
         protected SessionState $state,
-    ) {
-        //
-    }
+    ) {}
 
-    /**
-     * A new code for the step stored under the session key, or null when the step
-     * is no longer pending.
-     */
     public function issue(string $sessionKey, int|false|null $ttl): ?string
     {
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
@@ -49,20 +42,17 @@ class DeliveredCodes
             return false;
         }
 
-        // Counted before the code is compared, in the cache, which counts atomically:
-        // guesses sent at the same time would all read the same count from the session.
+        // Counted in the cache, atomically: concurrent guesses would read the same count from the session.
         $attemptsKey = 'guardian:two-factor:delivered-code:'.$delivered['hash'];
-        Cache::add($attemptsKey, 0, $this->attemptsTtl($ttl));
-        $attempt = (int) Cache::increment($attemptsKey);
+        $this->cache()->add($attemptsKey, 0, $this->attemptsTtl($ttl));
+        $attempt = (int) $this->cache()->increment($attemptsKey);
 
         $valid = $attempt <= self::MAX_WRONG_ATTEMPTS
             && hash_equals($delivered['hash'], $this->hash((string) preg_replace('/\s+/', '', $code)))
-            // Claimed atomically, so the code signs in one request even when it is sent
-            // by several at the same time.
-            && Cache::add('guardian:two-factor:delivered-code-used:'.$delivered['hash'], true, $this->attemptsTtl($ttl));
+            // Claimed atomically, so concurrent requests sign in once.
+            && $this->cache()->add('guardian:two-factor:delivered-code-used:'.$delivered['hash'], true, $this->attemptsTtl($ttl));
 
-        // Used once, or thrown away with the last guess it had. The count stays until
-        // it expires, for the requests still holding the session from before.
+        // The count stays until it expires, for requests still holding the old session.
         if ($valid || $attempt >= self::MAX_WRONG_ATTEMPTS) {
             $this->discard($sessionKey, $ttl);
         }
@@ -90,11 +80,15 @@ class DeliveredCodes
     }
 
     /**
-     * Keyed, so that the session store alone does not give the code away to anyone
-     * trying the million possible ones.
+     * Keyed, so the session store alone does not reveal the code.
      */
     protected function hash(string $code): string
     {
         return hash_hmac('sha256', $code, (string) config('app.key'));
+    }
+
+    protected function cache(): Repository
+    {
+        return Cache::store(config('guardian.cache_store'));
     }
 }

@@ -13,7 +13,5 @@ class TwoFactorRecoveryCodeUsed
     public function __construct(
         public readonly Fortress $fortress,
         public readonly Model $user,
-    ) {
-        //
-    }
+    ) {}
 }

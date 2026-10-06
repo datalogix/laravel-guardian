@@ -2,12 +2,16 @@
 
 namespace Datalogix\Guardian\Tests\Feature\TwoFactor;
 
+use Datalogix\Guardian\Actions\DisableTwoFactor;
 use Datalogix\Guardian\Actions\EnableTwoFactor;
 use Datalogix\Guardian\Actions\PrepareTwoFactorSetup;
 use Datalogix\Guardian\Enums\TwoFactorMethod;
+use Datalogix\Guardian\Exceptions\TwoFactorSetupException;
 use Datalogix\Guardian\Fortress;
+use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorSetupContext;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorUser;
+use Datalogix\Guardian\Tests\Attributes\WithFortresses;
 use Datalogix\Guardian\Tests\TestCase;
 use Illuminate\Support\Facades\DB;
 use PragmaRX\Google2FA\Google2FA;
@@ -91,9 +95,9 @@ class TwoFactorSetupContextTest extends TestCase
         $this->assertSame([
             'enabled' => false,
             'secretUnreadable' => false,
+            'canDisable' => false,
             'canManageRecoveryCodes' => false,
             'recoveryCodesCount' => 0,
-            'recoveryCodes' => [],
             'trustedDevices' => [],
         ], $this->context()->summary($user));
     }
@@ -109,7 +113,8 @@ class TwoFactorSetupContextTest extends TestCase
         $this->assertFalse($summary['secretUnreadable']);
         $this->assertTrue($summary['canManageRecoveryCodes']);
         $this->assertSame(8, $summary['recoveryCodesCount']);
-        $this->assertIsArray($summary['recoveryCodes']);
+        // Only their hashes are kept, so the summary has the count, not the codes.
+        $this->assertArrayNotHasKey('recoveryCodes', $summary);
     }
 
     public function test_the_summary_flags_a_secret_that_cannot_be_decrypted(): void
@@ -124,7 +129,7 @@ class TwoFactorSetupContextTest extends TestCase
 
         $this->assertTrue($summary['enabled']);
         $this->assertTrue($summary['secretUnreadable']);
-        $this->assertSame([], $summary['recoveryCodes']);
+        $this->assertSame(0, $summary['recoveryCodesCount']);
     }
 
     public function test_there_is_no_pending_setup_until_one_is_prepared(): void
@@ -140,5 +145,71 @@ class TwoFactorSetupContextTest extends TestCase
         $this->assertSame($setup['secret'], $pending['secret']);
         $this->assertStringStartsWith('otpauth://totp/', $pending['uri']);
         $this->assertStringContainsString('<svg', $pending['qrSvg']);
+    }
+
+    public function test_two_factor_can_be_disabled_when_the_fortress_does_not_require_it(): void
+    {
+        $user = $this->signInWithConfirmedPassword();
+        $this->enableTwoFactor($user);
+
+        $this->assertTrue($this->context()->summary($user->fresh())['canDisable']);
+    }
+
+    protected function requiringSetupOnLogin(): array
+    {
+        return [Fortress::make()->basic()->twoFactor(requireSetupOnLogin: true)];
+    }
+
+    #[WithFortresses('requiringSetupOnLogin')]
+    public function test_two_factor_cannot_be_disabled_when_the_fortress_requires_it(): void
+    {
+        $user = $this->signInWithConfirmedPassword();
+        $this->enableTwoFactor($user);
+
+        $this->assertFalse($this->context()->summary($user->fresh())['canDisable']);
+
+        try {
+            app(DisableTwoFactor::class)($user->fresh());
+            $this->fail('Two-factor authentication was disabled although the fortress requires it.');
+        } catch (TwoFactorSetupException $exception) {
+            $this->assertSame(TwoFactorSetupException::requiredByFortress()->errors(), $exception->errors());
+        }
+
+        $this->assertTrue(app(TwoFactorUser::class)->hasTwoFactorEnabled($user->fresh(), Guardian::getCurrentOrDefaultFortress()));
+    }
+
+    protected function requiringByPolicy(): array
+    {
+        return [Fortress::make()->basic()->twoFactor(requireWhen: fn ($user, $fortress, $isEnabled) => true)];
+    }
+
+    #[WithFortresses('requiringByPolicy')]
+    public function test_two_factor_cannot_be_disabled_when_the_policy_requires_it(): void
+    {
+        $user = $this->signInWithConfirmedPassword();
+        $this->enableTwoFactor($user);
+
+        $this->assertFalse($this->context()->summary($user->fresh())['canDisable']);
+    }
+
+    #[WithFortresses('requiringSetupOnLogin')]
+    public function test_a_secret_that_cannot_be_read_can_still_be_disabled_to_set_it_up_again(): void
+    {
+        $user = $this->signInWithConfirmedPassword();
+        $this->enableTwoFactor($user);
+
+        DB::table('users')->where('id', $user->id)->update(['two_factor_secret' => 'not-encrypted-data']);
+        $this->app->forgetInstance(TwoFactorUser::class);
+
+        $this->assertTrue($this->context()->summary($user->fresh())['canDisable']);
+
+        app(DisableTwoFactor::class)($user->fresh());
+
+        $this->assertNull(DB::table('users')->where('id', $user->id)->value('two_factor_secret'));
+    }
+
+    public function test_a_user_that_is_not_authenticatable_can_disable(): void
+    {
+        $this->assertTrue($this->context()->canDisable(new \stdClass));
     }
 }

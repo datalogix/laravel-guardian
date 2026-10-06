@@ -14,13 +14,13 @@ const t = useTranslator()
 const props = defineProps<{
     identifierKey: IdentifierKey
     loginUrl: string | null
+    termsUrl: string | null
     oauthProviders: OAuthProvider[]
     status: string | null
     endpoints: { submit: string }
 }>()
 
 const identifier = identifierField(props.identifierKey, t)
-// The login field already is the e-mail address unless the fortress signs in with something else (CPF, username…).
 const needsEmail = props.identifierKey !== 'email'
 const form = useForm({ name: '', login: '', email: '', password: '', password_confirmation: '', terms: false })
 
@@ -77,8 +77,11 @@ function submit() {
                 :error="form.errors.password_confirmation"
             />
 
-            <div class="space-y-1.5">
+            <div v-if="termsUrl" class="space-y-1.5">
                 <Checkbox v-model="form.terms" name="terms">{{ t('I accept the terms and conditions') }}</Checkbox>
+                <a :href="termsUrl" target="_blank" rel="noopener" class="text-sm font-medium text-zinc-900 underline underline-offset-4 hover:no-underline dark:text-zinc-100">
+                    {{ t('Read the terms and conditions') }}
+                </a>
                 <p v-if="form.errors.terms" role="alert" class="text-sm text-red-600 dark:text-red-400">{{ form.errors.terms }}</p>
             </div>
 

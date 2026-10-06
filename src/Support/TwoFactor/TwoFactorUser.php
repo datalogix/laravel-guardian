@@ -13,7 +13,6 @@ use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class TwoFactorUser
@@ -205,11 +204,6 @@ class TwoFactorUser
         return true;
     }
 
-    public function getTwoFactorRecoveryCodes(mixed $user, Fortress $fortress): array
-    {
-        return $this->filterRecoveryCodes($this->rawStoredRecoveryCodes($user, $fortress), excludeHashed: true);
-    }
-
     public function canStoreTwoFactorRecoveryCodes(mixed $user): bool
     {
         return $this->canUseContractOrColumn($user, CanManageTwoFactorRecoveryCodes::class, $this->getRecoveryCodesColumn());
@@ -259,7 +253,8 @@ class TwoFactorUser
 
     protected function consumeStoredRecoveryCodeWithLock(Model $user, Fortress $fortress, string $normalizedCandidate): bool
     {
-        return DB::transaction(function () use ($user, $fortress, $normalizedCandidate) {
+        // The lock only holds inside a transaction of the connection of the user.
+        return $user->getConnection()->transaction(function () use ($user, $fortress, $normalizedCandidate) {
             $locked = $user->newQuery()->lockForUpdate()->find($user->getKey());
 
             if (! $locked) {
@@ -293,7 +288,7 @@ class TwoFactorUser
         $consumed = false;
 
         foreach ($available as $code) {
-            if (! $consumed && $this->isRecoveryCodeMatch($code, $normalizedCandidate, $hashedCandidate)) {
+            if (! $consumed && $this->isRecoveryCodeMatch($code, $hashedCandidate)) {
                 $consumed = true;
 
                 continue;
@@ -307,6 +302,12 @@ class TwoFactorUser
 
     protected function persistTwoFactorRecoveryCodes(mixed $user, Fortress $fortress, array $codes): bool
     {
+        // Hashed wherever they are kept; the codes left after one was used are hashed already.
+        $codes = array_map(
+            fn (string $code) => $this->isHashedRecoveryCode($code) ? $code : $this->hashRecoveryCode($code),
+            array_values($codes),
+        );
+
         if ($user instanceof CanManageTwoFactorRecoveryCodes) {
             $user->saveTwoFactorRecoveryCodes($fortress, $codes);
 
@@ -318,8 +319,6 @@ class TwoFactorUser
         if (! $user instanceof Model || ! $this->hasRecoveryCodesColumn($user)) {
             return false;
         }
-
-        $codes = array_map(fn (string $code) => $this->hashRecoveryCode($code), array_values($codes));
 
         $user->forceFill([
             $this->getRecoveryCodesColumn() => json_encode($codes),
@@ -373,19 +372,19 @@ class TwoFactorUser
         }
     }
 
-    protected function getSecretColumn(): string
+    public function getSecretColumn(): string
     {
-        return 'two_factor_secret';
+        return config('guardian.columns.secret') ?? 'two_factor_secret';
     }
 
-    protected function getRecoveryCodesColumn(): string
+    public function getRecoveryCodesColumn(): string
     {
-        return 'two_factor_recovery_codes';
+        return config('guardian.columns.recovery_codes') ?? 'two_factor_recovery_codes';
     }
 
-    protected function getConfirmedAtColumn(): string
+    public function getConfirmedAtColumn(): string
     {
-        return 'two_factor_confirmed_at';
+        return config('guardian.columns.confirmed_at') ?? 'two_factor_confirmed_at';
     }
 
     protected function getStoredTwoFactorRecoveryCodes(mixed $user, Fortress $fortress): array
@@ -434,12 +433,9 @@ class TwoFactorUser
         return [];
     }
 
-    protected function filterRecoveryCodes(array $codes, bool $excludeHashed = false): array
+    protected function filterRecoveryCodes(array $codes): array
     {
-        return array_values(array_filter(
-            $codes,
-            fn ($code) => is_string($code) && filled($code) && (! $excludeHashed || ! $this->isHashedRecoveryCode($code)),
-        ));
+        return array_values(array_filter($codes, fn ($code) => is_string($code) && $this->isHashedRecoveryCode($code)));
     }
 
     protected function normalizeRecoveryCode(string $code): string
@@ -457,12 +453,8 @@ class TwoFactorUser
         return str_starts_with($code, $this->recoveryCodeHashPrefix);
     }
 
-    protected function isRecoveryCodeMatch(string $storedCode, string $normalizedCandidate, string $hashedCandidate): bool
+    protected function isRecoveryCodeMatch(string $storedCode, string $hashedCandidate): bool
     {
-        if ($this->isHashedRecoveryCode($storedCode)) {
-            return hash_equals($storedCode, $hashedCandidate);
-        }
-
-        return hash_equals($this->normalizeRecoveryCode($storedCode), $normalizedCandidate);
+        return hash_equals($storedCode, $hashedCandidate);
     }
 }

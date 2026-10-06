@@ -12,9 +12,10 @@ class ConfirmPassword extends Page
     public function submit()
     {
         return $this->forgettingSecrets(function () {
-            $data = $this->validate(ConfirmPasswordAction::rules());
+            $action = app(ConfirmPasswordAction::class);
+            $data = $this->validate($action::rules());
 
-            app(ConfirmPasswordAction::class)($data);
+            $action($data);
 
             return app(Guardian::getPasswordConfirmationFeature()->getResponse());
         }, 'password');

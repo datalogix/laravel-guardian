@@ -36,9 +36,7 @@ class HasPasswordResetTest extends TestCase
 
     protected function fortressesOverride(array $fortresses): void
     {
-        // getEnvironmentSetUp already ran for the default single-fortress setup by
-        // the time a test method executes, so this directly re-registers the
-        // registry's content instead, which is enough for a plain URL builder.
+        // The test's fortresses are already registered, so the registry is rebuilt.
         $registry = app(FortressRegistry::class);
         $registry->reset();
 

@@ -21,9 +21,10 @@ class ForgotPassword extends Page
 
     public function submit()
     {
-        $data = $this->validate(ForgotPasswordAction::rules());
+        $action = app(ForgotPasswordAction::class);
+        $data = $this->validate($action::rules());
 
-        $status = app(ForgotPasswordAction::class)($data);
+        $status = $action($data);
 
         return app(Guardian::getForgotPasswordFeature()->getResponse(), ['status' => $status]);
     }

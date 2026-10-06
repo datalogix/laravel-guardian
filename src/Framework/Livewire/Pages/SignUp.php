@@ -32,7 +32,6 @@ class SignUp extends Page
     public function submit()
     {
         return $this->forgettingSecrets(function () {
-            // The rules of the action the application bound, which may ask for more fields.
             $action = app(SignUpAction::class);
             $data = $this->validate($action::rules());
 

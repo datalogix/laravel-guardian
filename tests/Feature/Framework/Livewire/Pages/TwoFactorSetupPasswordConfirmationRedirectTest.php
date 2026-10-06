@@ -15,15 +15,12 @@ class TwoFactorSetupPasswordConfirmationRedirectTest extends TestCase
 {
     protected function fortresses(): array
     {
-        // basic() already enables passwordConfirmation(), so the component's
-        // redirectToPasswordConfirmation() has somewhere real to send the user.
         return [Fortress::make()->basic()->twoFactor()];
     }
 
     protected function withoutPasswordConfirmation(): array
     {
-        // Deliberately built without passwordConfirmation(), unlike basic(), so
-        // Guardian::passwordConfirmationUrl() has nowhere to send the user.
+        // Without passwordConfirmation(), unlike basic().
         return [
             Fortress::make()->id('default')->default()
                 ->login()
@@ -76,10 +73,7 @@ class TwoFactorSetupPasswordConfirmationRedirectTest extends TestCase
     {
         $this->actingAs($this->createUser());
 
-        // Livewire automatically catches the re-thrown ValidationException
-        // (PasswordConfirmationException extends it) and surfaces it as a
-        // component validation error instead of letting it bubble as a raw
-        // PHP exception, which is what the redirect-less branch falls back to.
+        // Livewire turns the rethrown ValidationException into a component error.
         Livewire::test(TwoFactorSetup::class)
             ->call('prepare')
             ->assertHasErrors('password');

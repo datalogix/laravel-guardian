@@ -9,9 +9,6 @@ use Illuminate\Support\Facades\Lang;
 use Inertia\ResponseFactory;
 use PHPUnit\Framework\Attributes\Group;
 
-/**
- * The pages translate their lines with the ones every page gets from the server.
- */
 #[Group('inertia')]
 class PageTranslationsTest extends InertiaTestCase
 {
@@ -112,8 +109,7 @@ class PageTranslationsTest extends InertiaTestCase
     public function test_an_application_adds_the_lines_of_the_pages_it_edits(): void
     {
         app()->setLocale('pt_BR');
-        // Lines added in a test would stand for the whole language, so the lang files
-        // of the language are loaded first, as they are in an application.
+        // The language's lang files load first, as in an application.
         __('Sign in');
         Lang::addLines(['*.Welcome back' => 'Bem-vindo de volta'], 'pt_BR');
         $this->app->bind(PageTranslations::class, fn () => new class extends PageTranslations

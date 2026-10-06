@@ -13,6 +13,8 @@ use InvalidArgumentException;
 
 trait HasOAuth
 {
+    public const MAX_OAUTH_PROVIDER_LENGTH = 50;
+
     protected ?OAuthFeature $oauthFeature = null;
 
     protected ?OAuthCompleteRegistrationFeature $oauthCompleteRegistrationFeature = null;
@@ -102,7 +104,15 @@ trait HasOAuth
                 );
             }
 
-            $normalizedProviders[] = $this->normalizeOAuthProvider($provider);
+            $normalizedProvider = $this->normalizeOAuthProvider($provider);
+
+            if (strlen($normalizedProvider) > static::MAX_OAUTH_PROVIDER_LENGTH) {
+                throw new InvalidArgumentException(
+                    "OAuth provider [{$normalizedProvider}] is longer than ".static::MAX_OAUTH_PROVIDER_LENGTH.' characters.'
+                );
+            }
+
+            $normalizedProviders[] = $normalizedProvider;
         }
 
         return array_values(array_unique($normalizedProviders));
@@ -162,7 +172,6 @@ trait HasOAuth
         ?string $email,
         ?string $name,
         ?string $avatar,
-        bool $emailVerified = false,
         ?string $accessToken = null,
         ?string $refreshToken = null,
         ?\DateTimeInterface $tokenExpiresAt = null,
@@ -174,7 +183,6 @@ trait HasOAuth
             $email,
             $name,
             $avatar,
-            $emailVerified,
             $accessToken,
             $refreshToken,
             $tokenExpiresAt,

@@ -23,9 +23,10 @@ class ForgotPasswordController extends PageController
 
     public function submit(Request $request)
     {
-        $data = $request->validate(ForgotPasswordAction::rules());
+        $action = app(ForgotPasswordAction::class);
+        $data = $request->validate($action::rules());
 
-        $status = app(ForgotPasswordAction::class)($data);
+        $status = $action($data);
 
         return $this->respond(
             app(Guardian::getForgotPasswordFeature()->getResponse(), ['status' => $status]),

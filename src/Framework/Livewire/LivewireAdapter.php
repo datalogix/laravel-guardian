@@ -3,6 +3,7 @@
 namespace Datalogix\Guardian\Framework\Livewire;
 
 use Datalogix\Guardian\Enums\Framework;
+use Datalogix\Guardian\Exceptions\FrameworkConfigurationException;
 use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Framework\AbstractFrameworkAdapter;
 use Datalogix\Guardian\Framework\Livewire\Pages\ConfirmPassword;
@@ -10,19 +11,18 @@ use Datalogix\Guardian\Framework\Livewire\Pages\EmailVerificationPrompt;
 use Datalogix\Guardian\Framework\Livewire\Pages\ForgotPassword;
 use Datalogix\Guardian\Framework\Livewire\Pages\Login;
 use Datalogix\Guardian\Framework\Livewire\Pages\OAuthCompleteRegistration;
+use Datalogix\Guardian\Framework\Livewire\Pages\Page;
 use Datalogix\Guardian\Framework\Livewire\Pages\ResetPassword;
 use Datalogix\Guardian\Framework\Livewire\Pages\SignUp;
 use Datalogix\Guardian\Framework\Livewire\Pages\TwoFactorChallenge;
 use Datalogix\Guardian\Framework\Livewire\Pages\TwoFactorSetup;
 use Livewire\Component;
 use Livewire\Livewire;
+use TALLKit\TALLKitServiceProvider;
 
 class LivewireAdapter extends AbstractFrameworkAdapter
 {
-    public function __construct(protected ComponentCache $cache = new ComponentCache)
-    {
-        //
-    }
+    public function __construct(protected ComponentCache $cache = new ComponentCache) {}
 
     public function framework(): Framework
     {
@@ -68,9 +68,6 @@ class LivewireAdapter extends AbstractFrameworkAdapter
     }
 
     /**
-     * The Livewire components of a fortress (name => class): the cached ones
-     * on a real request, otherwise the ones its enabled features route to.
-     *
      * @return array<string, string>
      */
     public function components(Fortress $fortress): array
@@ -80,10 +77,6 @@ class LivewireAdapter extends AbstractFrameworkAdapter
             : $this->discoverComponents($fortress);
     }
 
-    /**
-     * The view of a bundled page: the one of the folder the fortress names in
-     * ->livewire(views: '...') when it exists, otherwise the bundled one.
-     */
     public function viewFor(string $page, Fortress $fortress): string
     {
         $views = $fortress->getFrameworkOption('views');
@@ -97,6 +90,40 @@ class LivewireAdapter extends AbstractFrameworkAdapter
         }
 
         return 'guardian::'.$page;
+    }
+
+    /**
+     * The bundled views and layouts are built with tallkit, unlike published or custom ones.
+     */
+    public function validateFortress(Fortress $fortress): void
+    {
+        if (class_exists(TALLKitServiceProvider::class)) {
+            return;
+        }
+
+        foreach ($fortress->getFeatures() as $feature) {
+            $action = $feature->getRouteAction();
+
+            if (! $feature->hasFeature() || ! is_string($action) || ! is_subclass_of($action, Page::class)) {
+                continue;
+            }
+
+            $page = $feature->getPageName();
+            $layout = $fortress->getLayoutForPage($page) ?? Layout::Simple->value;
+
+            if ($this->isBundledView($this->viewFor($page, $fortress)) || $this->isBundledView($layout)) {
+                throw FrameworkConfigurationException::tallkitMissing($fortress->getId());
+            }
+        }
+    }
+
+    protected function isBundledView(string $view): bool
+    {
+        if (! str_starts_with($view, 'guardian::') || ! view()->exists($view)) {
+            return false;
+        }
+
+        return str_starts_with((string) realpath(view()->getFinder()->find($view)), (string) realpath(__DIR__.'/resources/views'));
     }
 
     public function cacheComponents(Fortress $fortress): void
@@ -151,9 +178,6 @@ class LivewireAdapter extends AbstractFrameworkAdapter
             : $livewire->redirect($path, navigate: $navigate);
     }
 
-    /**
-     * The tallkit alerts when that UI kit is installed, the status flash otherwise.
-     */
     public function notify(string $message, ?string $type = null): void
     {
         if (app()->bound('tallkit')) {

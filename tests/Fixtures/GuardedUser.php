@@ -5,9 +5,7 @@ namespace Datalogix\Guardian\Tests\Fixtures;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * A totally-guarded model (no $fillable, default $guarded = ['*']) used only to
- * force Illuminate\Database\Eloquent\MassAssignmentException from mass
- * assignment, exercising CreatesAuthenticatableUser's catch branch for it.
+ * Fully guarded, to force a MassAssignmentException.
  */
 class GuardedUser extends Model
 {

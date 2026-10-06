@@ -5,9 +5,6 @@ namespace Datalogix\Guardian\Framework\Inertia;
 use Datalogix\Guardian\Framework\FrameworkResolver;
 use Illuminate\Support\ServiceProvider;
 
-/**
- * Wires the Inertia front-end into Guardian: its adapter and publishable pages.
- */
 class InertiaServiceProvider extends ServiceProvider
 {
     public function register(): void

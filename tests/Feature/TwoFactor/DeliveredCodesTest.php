@@ -19,10 +19,6 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use PragmaRX\Google2FA\Google2FA;
 
-/**
- * A code sent by e-mail or SMS is the only one accepted: once, for a while, and
- * not after a few wrong guesses.
- */
 class DeliveredCodesTest extends TestCase
 {
     protected function fortresses(): array
@@ -255,8 +251,7 @@ class DeliveredCodesTest extends TestCase
         $code = $codes->issue('step', 600);
         $before = session('step');
 
-        // Every guess reads the session as it was before the others wrote to it, as
-        // requests sent at the same time do.
+        // Every guess reads the session as it was before the others wrote, like concurrent requests.
         foreach (range(1, 20) as $guess) {
             session()->put('step', $before);
             $codes->verify('step', $this->wrong($code), 600);

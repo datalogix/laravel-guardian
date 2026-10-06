@@ -143,13 +143,9 @@ trait HasTwoFactor
 
         $twoFactorUser = app(TwoFactorUser::class);
         $isEnabled = $twoFactorUser->hasTwoFactorEnabled($user, $this);
-        $policyResult = $this->twoFactorRequirementPolicy
-            ? ($this->twoFactorRequirementPolicy)($user, $this, $isEnabled)
-            : null;
 
-        $requiresChallenge = is_bool($policyResult) ? $policyResult : $isEnabled;
-
-        if (! $requiresChallenge) {
+        // Without a secret there is no code to ask for: the policy sends the user to setup instead.
+        if (! $isEnabled || ! ($this->twoFactorRequiredByPolicy($user, $isEnabled) ?? true)) {
             return false;
         }
 
@@ -166,10 +162,6 @@ trait HasTwoFactor
 
     public function requiresTwoFactorSetup(?Authenticatable $user): bool
     {
-        if (! $this->shouldRequireTwoFactorSetupOnLogin()) {
-            return false;
-        }
-
         if (! $this->getTwoFactorSetupFeature()->hasFeature()) {
             return false;
         }
@@ -180,11 +172,29 @@ trait HasTwoFactor
 
         $twoFactorUser = app(TwoFactorUser::class);
 
-        if (! $twoFactorUser->canStoreTwoFactorSecret($user)) {
+        if (! $twoFactorUser->canStoreTwoFactorSecret($user) || $twoFactorUser->hasTwoFactorEnabled($user, $this)) {
             return false;
         }
 
-        return ! $twoFactorUser->hasTwoFactorEnabled($user, $this);
+        return $this->shouldRequireTwoFactorSetupOnLogin()
+            || $this->twoFactorRequiredByPolicy($user, false) === true;
+    }
+
+    public function isTwoFactorRequiredFor(Authenticatable $user): bool
+    {
+        return $this->shouldRequireTwoFactorSetupOnLogin()
+            || $this->twoFactorRequiredByPolicy($user, true) === true;
+    }
+
+    protected function twoFactorRequiredByPolicy(Authenticatable $user, bool $isEnabled): ?bool
+    {
+        if (! $this->twoFactorRequirementPolicy) {
+            return null;
+        }
+
+        $required = ($this->twoFactorRequirementPolicy)($user, $this, $isEnabled);
+
+        return is_bool($required) ? $required : null;
     }
 
     public function shouldRequireTwoFactorSetupOnLogin(): bool

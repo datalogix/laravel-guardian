@@ -11,6 +11,7 @@ use Datalogix\Guardian\Support\TwoFactor\TwoFactorUser;
 use Datalogix\Guardian\Tests\Fixtures\NonModelTwoFactorUser;
 use Datalogix\Guardian\Tests\TestCase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -62,6 +63,30 @@ class TwoFactorTrustedDeviceManagerTest extends TestCase
         $this->manager->remember($this->fortress(), $user, enabled: true, days: 30, cookieName: 'remember_2fa');
 
         $this->assertSame($secure, app('cookie')->queued('remember_2fa')->isSecure());
+    }
+
+    public static function sameSiteSettings(): array
+    {
+        return [
+            'lax' => ['lax'],
+            'strict' => ['strict'],
+        ];
+    }
+
+    #[DataProvider('sameSiteSettings')]
+    public function test_remember_gives_the_cookie_the_same_site_of_the_session(string $sameSite): void
+    {
+        // The cookie jar takes its defaults from the session config when it is built.
+        config(['session.same_site' => $sameSite]);
+        $this->app->forgetInstance('cookie');
+        Cookie::clearResolvedInstance('cookie');
+
+        $user = $this->createUser();
+        app(TwoFactorUser::class)->saveTwoFactorSecret($user, $this->fortress(), 'a-secret');
+
+        $this->manager->remember($this->fortress(), $user, enabled: true, days: 30, cookieName: 'remember_2fa');
+
+        $this->assertSame($sameSite, app('cookie')->queued('remember_2fa')->getSameSite());
     }
 
     public function test_remember_does_nothing_without_a_two_factor_secret(): void
@@ -125,9 +150,6 @@ class TwoFactorTrustedDeviceManagerTest extends TestCase
         return $user;
     }
 
-    /**
-     * The ID of the device the manager remembered, read back from its cookie.
-     */
     protected function rememberDevice(object $user): int
     {
         $this->manager->remember($this->fortress(), $user, enabled: true, days: 30, cookieName: 'remember_2fa');
@@ -169,7 +191,6 @@ class TwoFactorTrustedDeviceManagerTest extends TestCase
         Event::assertDispatchedTimes(TwoFactorTrustedDevicesRevokedAll::class, 1);
         Event::assertDispatched(TwoFactorTrustedDevicesRevokedAll::class, fn ($event) => $event->user->is($user) && $event->count === 2);
 
-        // Nothing left to revoke, nothing to announce.
         $this->assertSame(0, $this->manager->revokeAll($this->fortress(), $user));
         Event::assertDispatchedTimes(TwoFactorTrustedDevicesRevokedAll::class, 1);
     }

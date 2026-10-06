@@ -10,9 +10,6 @@ use Datalogix\Guardian\Tests\TestCase;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\Group;
 
-/**
- * A customer app on Livewire and an admin panel on Inertia, in the same app.
- */
 #[Group('livewire')]
 #[Group('inertia')]
 class MultiFrameworkTest extends TestCase

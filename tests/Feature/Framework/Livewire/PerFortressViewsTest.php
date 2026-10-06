@@ -8,9 +8,6 @@ use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Tests\TestCase;
 use PHPUnit\Framework\Attributes\Group;
 
-/**
- * A customer app and an admin panel on Livewire, each with its own views.
- */
 #[Group('livewire')]
 class PerFortressViewsTest extends TestCase
 {
@@ -40,7 +37,7 @@ class PerFortressViewsTest extends TestCase
         $this->assertSame('guardian-tests::admin-auth.login', $this->adapter()->viewFor('login', $admin));
         $this->assertSame('guardian::sign-up', $this->adapter()->viewFor('sign-up', $admin));
 
-        $this->get('/admin/sign-up')->assertOk()->assertDontSee('ADMIN LOGIN VIEW')->assertSee('<tk:layout.auth', false);
+        $this->get('/admin/sign-up')->assertOk()->assertDontSee('ADMIN LOGIN VIEW')->assertSee('guardian test page: sign-up');
     }
 
     public function test_a_fortress_without_views_uses_the_bundled_ones(): void

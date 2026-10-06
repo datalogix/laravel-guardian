@@ -8,14 +8,10 @@ use Datalogix\Guardian\Exceptions\TwoFactorSecretDecryptionException;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Http\Concerns\ChecksTwoFactorSetupAccess;
 use Datalogix\Guardian\Response\Redirector;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Session;
 
-/**
- * What a two-factor setup page needs to know, whatever front-end renders it:
- * who is setting up, in which state they are and where to send them when a
- * sensitive action needs the password to be confirmed again.
- */
 class TwoFactorSetupContext
 {
     use ChecksTwoFactorSetupAccess;
@@ -24,13 +20,8 @@ class TwoFactorSetupContext
         protected TwoFactorUser $twoFactorUser,
         protected Totp $totp,
         protected QrCode $qrCode,
-    ) {
-        //
-    }
+    ) {}
 
-    /**
-     * The authenticated user or, while signing in, the user with a pending setup.
-     */
     public function user(): ?object
     {
         $user = Guardian::user();
@@ -49,10 +40,6 @@ class TwoFactorSetupContext
         $this->abortIfCannotAccessTwoFactorSetup($user);
     }
 
-    /**
-     * The user allowed to act on the setup, or null when there is none.
-     * Aborts with a 403 when the user cannot access the fortress.
-     */
     public function authorizedUser(bool $requireAuthenticated = false): ?object
     {
         $user = $requireAuthenticated ? Guardian::user() : $this->user();
@@ -77,9 +64,9 @@ class TwoFactorSetupContext
      * @return array{
      *     enabled: bool,
      *     secretUnreadable: bool,
+     *     canDisable: bool,
      *     canManageRecoveryCodes: bool,
      *     recoveryCodesCount: int,
-     *     recoveryCodes: array<int, string>,
      *     trustedDevices: array<int, array<string, mixed>>,
      * }
      */
@@ -90,16 +77,16 @@ class TwoFactorSetupContext
         $summary = [
             'enabled' => false,
             'secretUnreadable' => false,
+            'canDisable' => false,
             'canManageRecoveryCodes' => false,
             'recoveryCodesCount' => 0,
-            'recoveryCodes' => [],
             'trustedDevices' => [],
         ];
 
         try {
             $enabled = $this->twoFactorUser->hasTwoFactorEnabled($user, $fortress);
         } catch (TwoFactorSecretDecryptionException) {
-            return [...$summary, 'enabled' => true, 'secretUnreadable' => true];
+            return [...$summary, 'enabled' => true, 'secretUnreadable' => true, 'canDisable' => true];
         }
 
         if (! $enabled) {
@@ -107,16 +94,31 @@ class TwoFactorSetupContext
         }
 
         $summary['enabled'] = true;
+        $summary['canDisable'] = $this->canDisable($user);
         $summary['canManageRecoveryCodes'] = $this->twoFactorUser->canStoreTwoFactorRecoveryCodes($user);
 
         if ($summary['canManageRecoveryCodes']) {
-            $summary['recoveryCodes'] = $this->twoFactorUser->getTwoFactorRecoveryCodes($user, $fortress);
             $summary['recoveryCodesCount'] = $this->twoFactorUser->getTwoFactorRecoveryCodesCount($user, $fortress);
         }
 
         $summary['trustedDevices'] = $this->trustedDevices();
 
         return $summary;
+    }
+
+    public function canDisable(object $user): bool
+    {
+        if (! $user instanceof Authenticatable) {
+            return true;
+        }
+
+        try {
+            $this->twoFactorUser->hasTwoFactorEnabled($user, Guardian::getCurrentOrDefaultFortress());
+        } catch (TwoFactorSecretDecryptionException) {
+            return true;
+        }
+
+        return ! Guardian::isTwoFactorRequiredFor($user);
     }
 
     /**
@@ -130,8 +132,6 @@ class TwoFactorSetupContext
     }
 
     /**
-     * The secret waiting to be confirmed, if a setup was prepared.
-     *
      * @return array{method: TwoFactorMethod, secret: string, uri: ?string, qrSvg: ?string}|null
      */
     public function pendingSetup(?object $user): ?array
@@ -154,9 +154,6 @@ class TwoFactorSetupContext
         return ['method' => $method, 'secret' => $secret, 'uri' => $uri, 'qrSvg' => $this->qrCode->svg($uri)];
     }
 
-    /**
-     * Sends the user to confirm their password and back to the setup afterwards.
-     */
     public function redirectToPasswordConfirmation(PasswordConfirmationException $exception)
     {
         $url = Guardian::passwordConfirmationUrl();

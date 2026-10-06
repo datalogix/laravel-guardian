@@ -9,14 +9,9 @@ use InvalidArgumentException;
 
 abstract class AbstractFrameworkAdapter implements FrameworkAdapter
 {
-    /**
-     * A class that only exists when the framework package is installed.
-     */
     abstract protected function requiredClass(): string;
 
     /**
-     * The bundled page name => route action map.
-     *
      * @return array<string, string>
      */
     abstract protected function pages(): array;
@@ -35,15 +30,11 @@ abstract class AbstractFrameworkAdapter implements FrameworkAdapter
         return $this->pages()[$page] ?? throw new InvalidArgumentException("Unknown component [{$page}].");
     }
 
-    public function registerPageRoutes(Feature $feature, array|string $middleware): void
-    {
-        //
-    }
+    public function registerPageRoutes(Feature $feature, array|string $middleware): void {}
 
-    public function registerFortress(Fortress $fortress): void
-    {
-        //
-    }
+    public function registerFortress(Fortress $fortress): void {}
+
+    public function validateFortress(Fortress $fortress): void {}
 
     public function redirect(string $path, bool $intended = false, bool $navigate = true): mixed
     {

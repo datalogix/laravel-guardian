@@ -2,8 +2,10 @@
 
 namespace Datalogix\Guardian\Tests\Feature\Framework\Inertia;
 
+use Datalogix\Guardian\Actions\Login;
 use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Tests\Attributes\WithFortresses;
+use Datalogix\Guardian\Tests\Fixtures\LoginWithCaptcha;
 use PHPUnit\Framework\Attributes\Group;
 
 #[Group('inertia')]
@@ -92,5 +94,16 @@ class LoginControllerTest extends InertiaTestCase
 
         $this->assertPage($this->inertiaGet('/login'), 'Guardian/Login', ['oauthProviders' => $providers]);
         $this->assertPage($this->inertiaGet('/sign-up'), 'Guardian/SignUp', ['oauthProviders' => $providers]);
+    }
+
+    public function test_submit_validates_with_the_rules_of_the_bound_action(): void
+    {
+        $this->app->bind(Login::class, LoginWithCaptcha::class);
+        $this->createUser(['email' => 'inertia@example.com']);
+
+        $this->inertiaPost('/login', ['login' => 'inertia@example.com', 'password' => 'password'])
+            ->assertSessionHasErrors('captcha');
+
+        $this->assertGuest();
     }
 }

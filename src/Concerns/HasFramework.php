@@ -11,25 +11,18 @@ trait HasFramework
     protected Framework $framework;
 
     /**
-     * The options of the chosen front-end, as given to inertia() or livewire().
-     *
      * @var array<string, mixed>
      */
     protected array $frameworkOptions = [];
 
     /**
-     * @param  string|null  $prefix  the folder of the page components: "{prefix}/Login" ("Guardian" by default)
-     * @param  array<string, string>  $pages  page name => component, to render a single page from elsewhere
+     * @param  array<string, string>  $pages
      */
     public function inertia(?string $prefix = null, array $pages = []): static
     {
         return $this->setFramework(Framework::Inertia, ['prefix' => $prefix, 'pages' => $pages]);
     }
 
-    /**
-     * @param  string|null  $views  where the views of this fortress live: "admin.auth" renders
-     *                              "admin.auth.login", falling back to the bundled view of a page it lacks
-     */
     public function livewire(?string $views = null): static
     {
         return $this->setFramework(Framework::Livewire, ['views' => $views]);

@@ -31,9 +31,10 @@ class ResetPassword extends Page
     public function submit()
     {
         return $this->forgettingSecrets(function () {
-            $data = $this->validate(ResetPasswordAction::rules());
+            $action = app(ResetPasswordAction::class);
+            $data = $this->validate($action::rules());
 
-            $status = app(ResetPasswordAction::class)($data);
+            $status = $action($data);
 
             return app(Guardian::getResetPasswordFeature()->getResponse(), ['status' => $status]);
         }, 'password', 'password_confirmation');

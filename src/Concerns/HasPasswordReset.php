@@ -78,10 +78,6 @@ trait HasPasswordReset
         return $this->passwordBroker;
     }
 
-    /**
-     * Whether the forgot password form tells the visitor if an account exists
-     * for the login they typed (it does not, by default).
-     */
     public function passwordResetRevealsAccounts(): bool
     {
         return $this->revealsAccounts;

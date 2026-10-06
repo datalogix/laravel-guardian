@@ -20,10 +20,6 @@ abstract class InertiaTestCase extends TestCase
         return $this->get($uri, ['X-Inertia' => 'true']);
     }
 
-    /**
-     * Follows the Inertia protocol for a form submission: the client sends
-     * the X-Inertia header and expects redirects instead of HTML.
-     */
     protected function inertiaPost(string $uri, array $data = []): TestResponse
     {
         return $this->post($uri, $data, ['X-Inertia' => 'true']);

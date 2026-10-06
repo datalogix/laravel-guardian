@@ -4,10 +4,6 @@ namespace Datalogix\Guardian\Concerns;
 
 use BackedEnum;
 
-/**
- * The layout hints of the fortress: which layout each page asks for. What a
- * layout means, and the default when none is set, is up to the front-end.
- */
 trait HasLayouts
 {
     protected ?string $layout = null;

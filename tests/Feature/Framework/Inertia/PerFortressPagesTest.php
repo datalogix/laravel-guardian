@@ -5,9 +5,6 @@ namespace Datalogix\Guardian\Tests\Feature\Framework\Inertia;
 use Datalogix\Guardian\Fortress;
 use PHPUnit\Framework\Attributes\Group;
 
-/**
- * A customer app and an admin panel on Inertia, each with its own screens.
- */
 #[Group('inertia')]
 class PerFortressPagesTest extends InertiaTestCase
 {

@@ -31,7 +31,6 @@ class OAuthPendingRegistrationManagerTest extends TestCase
             email: 'pending@example.com',
             name: 'Pending',
             avatar: 'https://example.com/a.png',
-            emailVerified: true,
         );
 
         $session = $this->manager->get($this->fortress());
@@ -39,7 +38,6 @@ class OAuthPendingRegistrationManagerTest extends TestCase
         $this->assertSame('github', $session['provider']);
         $this->assertSame('gh-1', $session['provider_user_id']);
         $this->assertSame('pending@example.com', $session['email']);
-        $this->assertTrue($session['email_verified']);
     }
 
     public function test_get_returns_null_when_nothing_is_pending(): void

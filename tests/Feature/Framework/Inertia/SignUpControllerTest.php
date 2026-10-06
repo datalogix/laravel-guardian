@@ -3,7 +3,9 @@
 namespace Datalogix\Guardian\Tests\Feature\Framework\Inertia;
 
 use Datalogix\Guardian\Actions\SignUp as SignUpAction;
+use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Support\Auth\PostAuthenticationFlow;
+use Datalogix\Guardian\Tests\Attributes\WithFortresses;
 use PHPUnit\Framework\Attributes\Group;
 
 #[Group('inertia')]
@@ -41,10 +43,23 @@ class SignUpControllerTest extends InertiaTestCase
 
     public function test_submit_validates_the_payload(): void
     {
-        $this->inertiaPost('/sign-up', $this->payload(['password_confirmation' => 'different', 'terms' => false]))
-            ->assertSessionHasErrors(['password', 'terms']);
+        $this->inertiaPost('/sign-up', $this->payload(['password_confirmation' => 'different']))
+            ->assertSessionHasErrors('password');
 
         $this->assertDatabaseMissing('users', ['email' => 'new@example.com']);
+    }
+
+    protected function withTerms(): array
+    {
+        return [Fortress::make()->inertia()->product()->default()->signUp(termsUrl: 'https://example.com/terms')];
+    }
+
+    #[WithFortresses('withTerms')]
+    public function test_the_terms_are_linked_and_must_be_accepted(): void
+    {
+        $this->assertSame('https://example.com/terms', $this->inertiaGet('/sign-up')->json('props.termsUrl'));
+
+        $this->inertiaPost('/sign-up', $this->payload(['terms' => false]))->assertSessionHasErrors('terms');
     }
 
     public function test_submit_rejects_an_email_that_is_already_registered(): void

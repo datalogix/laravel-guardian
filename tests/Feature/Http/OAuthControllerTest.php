@@ -42,7 +42,7 @@ class OAuthControllerTest extends TestCase
     public function test_callback_authenticates_and_responds(): void
     {
         $driver = \Mockery::mock(Provider::class);
-        $driver->shouldReceive('user')->andReturn(SocialiteUser::fake(['id' => 'gh-1', 'email' => 'callback@example.com']));
+        $driver->shouldReceive('user')->andReturn(SocialiteUser::fake(['id' => 'gh-1', 'email' => 'callback@example.com', 'email_verified' => true]));
         Socialite::shouldReceive('driver')->with('github')->andReturn($driver);
 
         $response = $this->get(Guardian::getOAuthFeature()->getCallbackUrl('github'));

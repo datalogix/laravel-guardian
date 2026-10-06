@@ -15,8 +15,7 @@ class TrustedDevicesUnavailableTest extends TestCase
     {
         parent::setUp();
 
-        // Simulates a consuming app that never enabled the trusted-devices
-        // feature, so Guardian's conditional migration never ran.
+        // An app that never enabled trusted devices: the migration never ran.
         Schema::dropIfExists('two_factor_trusted_devices');
 
         $this->trustedDevices = new TrustedDevices;

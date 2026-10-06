@@ -13,9 +13,9 @@ use Datalogix\Guardian\Enums\TwoFactorMethod;
             <tk:text label="We could not verify your two-factor secret. Please disable and set up two-factor authentication again." />
         @endif
 
-        @unless ($awaitingContinueAfterSetup)
+        @if ($canDisable && ! $awaitingContinueAfterSetup)
             <tk:button action="disable" label="Disable two-factor" />
-        @endunless
+        @endif
 
         @if (count($recoveryCodes) > 0)
             <tk:separator />

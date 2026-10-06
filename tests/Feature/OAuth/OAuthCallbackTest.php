@@ -35,8 +35,7 @@ class OAuthCallbackTest extends TestCase
     }
 
     /**
-     * Without a transaction around the sign-up, a row inserted while creating the
-     * user stays, like one committed by another request.
+     * Without a transaction, a row inserted during the sign-up stays, like another request's.
      */
     protected function withoutTransactions(): array
     {
@@ -57,7 +56,7 @@ class OAuthCallbackTest extends TestCase
     {
         Event::fake([Registered::class]);
 
-        $this->mockSocialiteUser('github', ['id' => 'gh-1', 'email' => 'new-oauth@example.com', 'name' => 'OAuth User']);
+        $this->mockSocialiteUser('github', ['id' => 'gh-1', 'email' => 'new-oauth@example.com', 'name' => 'OAuth User', 'email_verified' => true]);
 
         $result = app(OAuthCallback::class)('github');
 
@@ -69,20 +68,16 @@ class OAuthCallbackTest extends TestCase
 
     public function test_it_logs_in_a_previously_linked_user(): void
     {
-        // First call auto-creates and links the account (no pre-existing user
-        // shares this email, so there is no collision to resolve).
-        $this->mockSocialiteUser('github', ['id' => 'gh-2', 'email' => 'linked@example.com']);
+        $this->mockSocialiteUser('github', ['id' => 'gh-2', 'email' => 'linked@example.com', 'email_verified' => true]);
         app(OAuthCallback::class)('github');
 
         $user = User::whereEmail('linked@example.com')->firstOrFail();
         $this->assertTrue(Guardian::user()->is($user));
         $this->assertDatabaseHas('oauth_identities', ['provider_user_id' => 'gh-2']);
 
-        // Logging in again through the same provider id reuses the link,
-        // bypassing the email-collision policy entirely.
         Guardian::auth()->logout();
 
-        $this->mockSocialiteUser('github', ['id' => 'gh-2', 'email' => 'linked@example.com']);
+        $this->mockSocialiteUser('github', ['id' => 'gh-2', 'email' => 'linked@example.com', 'email_verified' => true]);
         app(OAuthCallback::class)('github');
 
         $this->assertTrue(Guardian::user()->is($user));
@@ -100,15 +95,32 @@ class OAuthCallbackTest extends TestCase
         $this->assertNotNull($user->email_verified_at);
     }
 
-    public function test_a_provider_user_without_raw_claims_creates_an_unverified_user(): void
+    public function test_a_provider_user_without_raw_claims_is_not_given_an_account(): void
     {
+        // Nothing says the e-mail is verified, so it could be the e-mail of someone else.
         $this->mockContractOnlySocialiteUser('github', 'gh-raw', 'no-claims@example.com');
 
-        app(OAuthCallback::class)('github');
+        try {
+            app(OAuthCallback::class)('github');
+            $this->fail('An account was created for an e-mail the provider did not verify.');
+        } catch (OAuthException $exception) {
+            $this->assertSame(OAuthException::emailNotVerified()->errors(), $exception->errors());
+        }
 
-        $user = User::whereEmail('no-claims@example.com')->firstOrFail();
-        $this->assertNull($user->email_verified_at);
-        $this->assertSame('Github User', $user->name);
+        $this->assertDatabaseMissing('users', ['email' => 'no-claims@example.com']);
+    }
+
+    public function test_an_unverified_provider_email_is_not_given_an_account(): void
+    {
+        $this->mockSocialiteUser('github', ['id' => 'gh-unverified', 'email' => 'someone-else@example.com', 'email_verified' => false]);
+
+        $this->expectException(OAuthException::class);
+
+        try {
+            app(OAuthCallback::class)('github');
+        } finally {
+            $this->assertDatabaseMissing('users', ['email' => 'someone-else@example.com']);
+        }
     }
 
     #[WithFortresses('linkingVerifiedEmails')]
@@ -197,7 +209,7 @@ class OAuthCallbackTest extends TestCase
             'password' => 'x',
         ]));
 
-        $this->mockSocialiteUser('github', ['id' => 'gh-race', 'email' => 'race@example.com']);
+        $this->mockSocialiteUser('github', ['id' => 'gh-race', 'email' => 'race@example.com', 'email_verified' => true]);
 
         try {
             app(OAuthCallback::class)('github');
@@ -222,10 +234,7 @@ class OAuthCallbackTest extends TestCase
 
     public function test_store_identity_translates_a_query_exception_into_identity_already_linked(): void
     {
-        // OAuthIdentities::link() already prevents duplicate links with its
-        // own proactive checks; this exercises the caller's translation of a
-        // genuine concurrent-insert failure into a proper OAuthException,
-        // without touching that race-prevention logic itself.
+        // A concurrent insert that the checks of link() cannot catch.
         $identities = Mockery::mock(OAuthIdentities::class);
         $identities->shouldReceive('link')->once()->andThrow(
             new QueryException('sqlite', 'insert into "oauth_identities" ...', [], new PDOException('UNIQUE constraint failed'))
@@ -233,7 +242,7 @@ class OAuthCallbackTest extends TestCase
         $identities->shouldReceive('findAuthenticatableId')->andReturnNull();
         $this->app->instance(OAuthIdentities::class, $identities);
 
-        $this->mockSocialiteUser('github', ['id' => 'qe-1', 'email' => 'qe@example.com']);
+        $this->mockSocialiteUser('github', ['id' => 'qe-1', 'email' => 'qe@example.com', 'email_verified' => true]);
 
         try {
             app(OAuthCallback::class)('github');

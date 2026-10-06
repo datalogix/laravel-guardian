@@ -62,11 +62,7 @@ class EmailVerificationFlowTest extends TestCase
 
     public function test_it_logs_out_and_redirects_to_login_when_verification_is_required_without_a_prompt_page(): void
     {
-        // A standalone, unregistered Fortress: email verification is required
-        // but the prompt route was explicitly disabled, a combination
-        // FortressRegistry::validate() would normally reject at boot time.
-        // Setting it as "current" directly bypasses that boot-time check so the
-        // response class's own runtime fallback can be exercised in isolation.
+        // Not registered: the boot-time validation would reject this combination.
         $fortress = Fortress::make()->basic()->emailVerification(promptRouteAction: false, isRequired: true);
         Guardian::setCurrentFortress($fortress);
 

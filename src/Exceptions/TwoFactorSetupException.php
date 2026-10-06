@@ -19,9 +19,11 @@ class TwoFactorSetupException extends ValidationException
         return static::failed();
     }
 
-    /**
-     * The user did nothing wrong: the application could not store the secret.
-     */
+    public static function requiredByFortress(): static
+    {
+        return static::withMessages(['code' => [__('Two-factor authentication is required for your account, so it cannot be disabled.')]]);
+    }
+
     public static function unableToStoreSecret(): static
     {
         return static::withMessages(['code' => [__('We could not save your two-factor settings. Please try again later.')]]);

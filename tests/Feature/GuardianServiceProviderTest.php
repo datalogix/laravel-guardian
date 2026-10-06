@@ -113,9 +113,7 @@ class GuardianServiceProviderTest extends TestCase
 
     public function test_trusted_device_pruning_scheduling_is_a_no_op_without_a_bound_schedule(): void
     {
-        // Illuminate\Console\Scheduling\Schedule is bound by an auto-discovered
-        // console package provider, not by the framework core, so a minimal
-        // container that hasn't loaded it must not blow up trying to use it.
+        // Schedule is bound by a console provider, which a minimal container may not load.
         $container = new Container;
         $provider = new GuardianServiceProvider($container);
 

@@ -2,11 +2,6 @@ import { usePage } from '@inertiajs/vue3'
 
 export type Translator = (key: string, replace?: Record<string, string | number>) => string
 
-/**
- * Translates a line of the page into the language of the request, with the lines
- * Guardian shares with every page; a line without a translation stays as it is.
- * Placeholders are written like Laravel's: t('Welcome, :name', { name }).
- */
 export function useTranslator(): Translator {
     const page = usePage<{ translations?: Record<string, string> }>()
 

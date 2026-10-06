@@ -25,7 +25,6 @@ export default function Login({ identifierKey, forgotPasswordUrl, signUpUrl, oau
     const identifier = identifierField(identifierKey, t)
     const { data, setData, post, processing, errors, reset } = useForm({ login: '', password: '', remember: false })
 
-    // A refused social sign-in redirects here with the reason in the shared errors.
     const providerError = usePage<{ errors: PageErrors }>().props.errors?.oauth
 
     function submit(event: FormEvent) {

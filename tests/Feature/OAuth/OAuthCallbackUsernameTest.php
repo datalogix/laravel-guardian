@@ -16,9 +16,6 @@ use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 
-/**
- * A new user of a fortress identified by username gets one generated from the provider.
- */
 #[Group('socialite')]
 class OAuthCallbackUsernameTest extends TestCase
 {
@@ -30,8 +27,7 @@ class OAuthCallbackUsernameTest extends TestCase
     }
 
     /**
-     * Without a transaction around the sign-up, a row inserted while creating the
-     * user stays, like one committed by another request.
+     * Without a transaction, a row inserted during the sign-up stays, like another request's.
      */
     protected function withoutTransactions(): array
     {
@@ -50,6 +46,7 @@ class OAuthCallbackUsernameTest extends TestCase
         $this->mockSocialiteUser('github', [
             'id' => 'gh-1',
             'email' => 'newbie@example.com',
+            'email_verified' => true,
             'nickname' => 'Cool_Nickname!',
             'token' => 'access-token-value',
             'refreshToken' => 'refresh-token-value',
@@ -83,7 +80,7 @@ class OAuthCallbackUsernameTest extends TestCase
     #[DataProvider('usernameSources')]
     public function test_the_username_is_derived_from_the_best_available_source(array $attributes, string $prefix): void
     {
-        $this->mockSocialiteUser('github', ['id' => 'gh-source', ...$attributes]);
+        $this->mockSocialiteUser('github', ['id' => 'gh-source', ...$attributes, 'email_verified' => true]);
 
         app(OAuthCallback::class)('github');
 
@@ -101,7 +98,7 @@ class OAuthCallbackUsernameTest extends TestCase
             'password' => 'x',
         ]));
 
-        $this->mockSocialiteUser('github', ['id' => 'gh-race', 'email' => 'race@example.com', 'nickname' => 'racer']);
+        $this->mockSocialiteUser('github', ['id' => 'gh-race', 'email' => 'race@example.com', 'nickname' => 'racer', 'email_verified' => true]);
 
         try {
             app(OAuthCallback::class)('github');
@@ -114,13 +111,10 @@ class OAuthCallbackUsernameTest extends TestCase
 
     public function test_it_retries_with_a_random_suffix_when_the_deterministic_username_is_taken(): void
     {
-        // "gh-retry-1" deterministically generates the username
-        // "testuser_20aed8" (nickname + first 6 hex chars of sha1(provider id)).
-        // Pre-occupying that exact slot forces generateUsername() into its
-        // random-retry loop.
+        // Takes the deterministic username, forcing the random retries.
         $this->createUser(['username' => 'testuser_20aed8']);
 
-        $this->mockSocialiteUser('github', ['id' => 'gh-retry-1', 'email' => 'retry@example.com', 'nickname' => 'testuser']);
+        $this->mockSocialiteUser('github', ['id' => 'gh-retry-1', 'email' => 'retry@example.com', 'nickname' => 'testuser', 'email_verified' => true]);
 
         $result = app(OAuthCallback::class)('github');
 
@@ -133,17 +127,14 @@ class OAuthCallbackUsernameTest extends TestCase
 
     public function test_it_falls_back_to_a_fully_random_username_once_every_retry_collides(): void
     {
-        // "gh-exhaust-1" deterministically generates "testuser_<sha1 prefix>";
-        // forcing every Str::random() call to the same fixed value means all
-        // 5 retry-loop candidates collide too, exhausting generateUsername()
-        // into its final fully-random fallback.
+        // Every retry collides too, forcing the fully random fallback.
         $deterministic = 'testuser_'.Str::lower(substr(sha1('gh-exhaust-1'), 0, 6));
         $this->createUser(['username' => $deterministic]);
 
         Str::createRandomStringsUsing(fn () => 'zzzzzz');
         $this->createUser(['username' => 'testuser_zzzzzz']);
 
-        $this->mockSocialiteUser('github', ['id' => 'gh-exhaust-1', 'email' => 'exhaust@example.com', 'nickname' => 'testuser']);
+        $this->mockSocialiteUser('github', ['id' => 'gh-exhaust-1', 'email' => 'exhaust@example.com', 'nickname' => 'testuser', 'email_verified' => true]);
 
         $result = app(OAuthCallback::class)('github');
 

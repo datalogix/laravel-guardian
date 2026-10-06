@@ -6,6 +6,7 @@ use Datalogix\Guardian\Exceptions\PasswordConfirmationException;
 use Datalogix\Guardian\Exceptions\TwoFactorSetupException;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\TwoFactor\TwoFactorLifecycleManager;
+use Datalogix\Guardian\Support\TwoFactor\TwoFactorSetupContext;
 
 class DisableTwoFactor
 {
@@ -14,12 +15,14 @@ class DisableTwoFactor
 
     public function __construct(
         protected TwoFactorLifecycleManager $lifecycleManager,
-    ) {
-        //
-    }
+    ) {}
 
     public function __invoke(object $user): void
     {
+        if (! app(TwoFactorSetupContext::class)->canDisable($user)) {
+            throw TwoFactorSetupException::requiredByFortress();
+        }
+
         if (! $this->passwordWasRecentlyConfirmed()) {
             throw PasswordConfirmationException::requiredForDisablingTwoFactor();
         }

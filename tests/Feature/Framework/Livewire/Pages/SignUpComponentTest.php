@@ -7,6 +7,7 @@ use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Framework\Livewire\Pages\SignUp;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\Auth\PostAuthenticationFlow;
+use Datalogix\Guardian\Tests\Attributes\WithFortresses;
 use Datalogix\Guardian\Tests\TestCase;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Group;
@@ -38,6 +39,12 @@ class SignUpComponentTest extends TestCase
         $this->assertTrue(Guardian::isAuthenticated());
     }
 
+    protected function withTerms(): array
+    {
+        return [Fortress::make()->product()->default()->signUp(termsUrl: 'https://example.com/terms')];
+    }
+
+    #[WithFortresses('withTerms')]
     public function test_submit_fails_validation_without_accepting_terms(): void
     {
         Livewire::test(SignUp::class)

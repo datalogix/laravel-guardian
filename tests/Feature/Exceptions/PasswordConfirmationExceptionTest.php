@@ -15,7 +15,6 @@ class PasswordConfirmationExceptionTest extends TestCase
             'requiredForEnablingTwoFactor' => ['requiredForEnablingTwoFactor', 'Please confirm your password before enabling two-factor authentication.'],
             'requiredForDisablingTwoFactor' => ['requiredForDisablingTwoFactor', 'Please confirm your password before disabling two-factor authentication.'],
             'requiredForRegeneratingRecoveryCodes' => ['requiredForRegeneratingRecoveryCodes', 'Please confirm your password before regenerating two-factor recovery codes.'],
-            'requiredForDisconnectingOAuth' => ['requiredForDisconnectingOAuth', 'Please confirm your password before disconnecting this provider.'],
         ];
     }
 

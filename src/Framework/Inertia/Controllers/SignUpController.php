@@ -18,13 +18,13 @@ class SignUpController extends PageController
         return [
             'identifierKey' => Guardian::getIdentifierKey()->value,
             'loginUrl' => Guardian::loginUrl(),
+            'termsUrl' => Guardian::getSignUpTermsUrl(),
             'oauthProviders' => $this->oauthProviders(),
         ];
     }
 
     public function submit(Request $request)
     {
-        // The rules of the action the application bound, which may ask for more fields.
         $action = app(SignUpAction::class);
         $data = $request->validate($action::rules());
 

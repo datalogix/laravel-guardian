@@ -14,7 +14,5 @@ class TwoFactorRecoveryCodesRegenerated
         public readonly Fortress $fortress,
         public readonly Model $user,
         public readonly int $count = 0,
-    ) {
-        //
-    }
+    ) {}
 }

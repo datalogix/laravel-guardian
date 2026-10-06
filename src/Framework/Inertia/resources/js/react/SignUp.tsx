@@ -12,16 +12,16 @@ import { useTranslator } from './components/translate'
 interface Props {
     identifierKey: IdentifierKey
     loginUrl: string | null
+    termsUrl: string | null
     oauthProviders: OAuthProvider[]
     status: string | null
     endpoints: { submit: string }
 }
 
-export default function SignUp({ identifierKey, loginUrl, oauthProviders, status, endpoints }: Props) {
+export default function SignUp({ identifierKey, loginUrl, termsUrl, oauthProviders, status, endpoints }: Props) {
     const t = useTranslator()
 
     const identifier = identifierField(identifierKey, t)
-    // The login field already is the e-mail address unless the fortress signs in with something else (CPF, username…).
     const needsEmail = identifierKey !== 'email'
     const { data, setData, post, processing, errors, reset, transform } = useForm({
         name: '',
@@ -103,16 +103,26 @@ export default function SignUp({ identifierKey, loginUrl, oauthProviders, status
                     error={errors.password_confirmation}
                 />
 
-                <div className="space-y-1.5">
-                    <Checkbox name="terms" checked={data.terms} onChange={(checked) => setData('terms', checked)}>
-                        {t('I accept the terms and conditions')}
-                    </Checkbox>
-                    {errors.terms && (
-                        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                            {errors.terms}
-                        </p>
-                    )}
-                </div>
+                {termsUrl && (
+                    <div className="space-y-1.5">
+                        <Checkbox name="terms" checked={data.terms} onChange={(checked) => setData('terms', checked)}>
+                            {t('I accept the terms and conditions')}
+                        </Checkbox>
+                        <a
+                            href={termsUrl}
+                            target="_blank"
+                            rel="noopener"
+                            className="text-sm font-medium text-zinc-900 underline underline-offset-4 hover:no-underline dark:text-zinc-100"
+                        >
+                            {t('Read the terms and conditions')}
+                        </a>
+                        {errors.terms && (
+                            <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                                {errors.terms}
+                            </p>
+                        )}
+                    </div>
+                )}
 
                 <Button type="submit" full processing={processing}>
                     {t('Create account')}

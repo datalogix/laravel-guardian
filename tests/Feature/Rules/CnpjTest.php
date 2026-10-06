@@ -14,6 +14,8 @@ class CnpjTest extends TestCase
         return [
             'formatted' => ['11.222.333/0001-81'],
             'unformatted' => ['11222333000181'],
+            'alphanumeric' => ['12.ABC.345/01DE-35'],
+            'alphanumeric in lower case' => ['12abc34501de35'],
         ];
     }
 
@@ -25,6 +27,7 @@ class CnpjTest extends TestCase
             'invalid check digit' => ['11.222.333/0001-82'],
             // 14 characters, not all repeated, but the check digits are letters.
             'non-digit check digits' => ['112223330001AB'],
+            'characters other than the usual punctuation' => ['11.222.333/0001-81#'],
         ];
     }
 

@@ -14,9 +14,7 @@ use PHPUnit\Framework\Attributes\Group;
 use PragmaRX\Google2FA\Google2FA;
 
 /**
- * The controllers guard themselves as well as relying on the middleware of
- * their routes, so they are exercised here without that middleware, and with
- * a password confirmation that has gone stale.
+ * Without the route middleware, so the controllers' own guards run.
  */
 #[Group('inertia')]
 class TwoFactorControllersEdgeCasesTest extends InertiaTestCase

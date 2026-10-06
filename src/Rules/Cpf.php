@@ -19,6 +19,10 @@ class Cpf implements ValidationRule
 
     private function isValid(string $value): bool
     {
+        if (preg_match('/[^0-9.\-\s]/', $value)) {
+            return false;
+        }
+
         $cpf = preg_replace('/\D/', '', $value);
 
         if (strlen($cpf) !== 11 || preg_match('/^(\d)\1{10}$/', $cpf)) {

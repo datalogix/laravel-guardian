@@ -23,6 +23,7 @@ class CpfTest extends TestCase
             'wrong length' => ['1234'],
             'all repeated digits' => ['111.111.111-11'],
             'invalid check digit' => ['529.982.247-26'],
+            'letters among the digits' => ['529a982b247c25'],
         ];
     }
 

@@ -10,9 +10,6 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Timebox;
 
-/**
- * A fortress that chooses to tell the visitor whether the account exists.
- */
 class ForgotPasswordRevealingAccountsTest extends TestCase
 {
     protected function fortresses(): array

@@ -7,10 +7,6 @@ use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 
-/**
- * Laravel 11+ applications send the e-mail verification notification of every
- * Registered user out of the box (Application::configure()->withEvents()).
- */
 class FrameworkVerificationListener
 {
     public static function isRegistered(): bool

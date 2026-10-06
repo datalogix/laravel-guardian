@@ -7,10 +7,7 @@ use Datalogix\Guardian\Fortress;
 use Illuminate\Contracts\Auth\Authenticatable;
 
 /**
- * A plain (non-Eloquent) object implementing TwoFactorAuthenticatable, to
- * exercise TwoFactorUser's and HasTwoFactor's non-Model branches (e.g.
- * secretCacheKey() falls back to spl_object_id() instead of a Model's
- * primary key, and no confirmed-at timestamp can ever be tracked for it).
+ * A non-Eloquent user implementing TwoFactorAuthenticatable.
  */
 class NonModelTwoFactorUser implements Authenticatable, TwoFactorAuthenticatable
 {
@@ -51,10 +48,7 @@ class NonModelTwoFactorUser implements Authenticatable, TwoFactorAuthenticatable
         return null;
     }
 
-    public function setRememberToken($value): void
-    {
-        //
-    }
+    public function setRememberToken($value): void {}
 
     public function getRememberTokenName(): string
     {

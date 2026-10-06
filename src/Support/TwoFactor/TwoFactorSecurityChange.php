@@ -8,10 +8,6 @@ use Datalogix\Guardian\Http\Middleware\AuthenticateSession;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Str;
 
-/**
- * Enabling two-factor authentication is what a user does who fears someone
- * else has their password, so whoever else is signed in is signed out.
- */
 class TwoFactorSecurityChange
 {
     public function apply(object $user): void
@@ -24,7 +20,7 @@ class TwoFactorSecurityChange
         try {
             Guardian::authProvider()->updateRememberToken($user, Str::random(60));
         } catch (UnsupportedAuthGuardException) {
-            //
+            // A guard without a provider has no remember token to rotate.
         }
 
         // The other sessions are signed out on their next request; this one stays.

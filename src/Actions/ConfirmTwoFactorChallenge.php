@@ -18,11 +18,6 @@ use Illuminate\Support\Timebox;
 
 class ConfirmTwoFactorChallenge implements HasValidationRules
 {
-    /**
-     * Wrong codes a user may enter in a day, whatever the limit per minute: without
-     * it, whoever has the password could keep guessing at that pace for as long as
-     * they like.
-     */
     public const DAILY_MAX_ATTEMPTS = 20;
 
     use Concerns\HasRateLimiter;
@@ -30,9 +25,7 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
     public function __construct(
         protected TwoFactorChallengeVerifier $challengeVerifier,
         protected PostAuthenticationFlow $postAuthenticationFlow,
-    ) {
-        //
-    }
+    ) {}
 
     public function __invoke(array $data = []): AuthFlowResult
     {
@@ -117,7 +110,10 @@ class ConfirmTwoFactorChallenge implements HasValidationRules
         return app(Timebox::class)->call(function ($timebox) use ($user, $fortress, $code) {
             $result = $this->challengeVerifier->verify($user, $fortress, $code);
 
-            $timebox->returnEarly();
+            // Only a valid code returns early, so timing does not reveal a wrong one.
+            if ($result->isValid()) {
+                $timebox->returnEarly();
+            }
 
             return $result;
         }, config('auth.timebox_duration', 200000));

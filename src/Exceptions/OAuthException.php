@@ -48,6 +48,13 @@ class OAuthException extends ValidationException
         ]);
     }
 
+    public static function emailNotVerified(): static
+    {
+        return static::withMessages([
+            'oauth' => [__('The provider did not confirm that this e-mail is verified, so no account was created.')],
+        ]);
+    }
+
     public static function manualLinkRequired(): static
     {
         return static::withMessages([

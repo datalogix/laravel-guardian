@@ -14,14 +14,10 @@ use Inertia\ResponseFactory;
 
 abstract class PageController
 {
-    /**
-     * The bundled page this controller renders (matches the feature page name).
-     */
     abstract protected static function page(): string;
 
     /**
-     * The extra endpoints of the page, besides its GET route:
-     * name => [HTTP method, URI appended to the page URI, controller method, route parameter constraints].
+     * name => [method, URI suffix, controller method, route constraints]
      *
      * @return array<string, array{0: string, 1: string, 2: string, 3?: array<string, string>}>
      */
@@ -52,10 +48,6 @@ abstract class PageController
         ]);
     }
 
-    /**
-     * Where Inertia can (v3), the browser keeps the lines of a language across
-     * visits instead of getting them with every page.
-     */
     protected function translations(): mixed
     {
         $translations = fn () => app(PageTranslations::class)->all();
@@ -80,9 +72,6 @@ abstract class PageController
         );
     }
 
-    /**
-     * The URL of every endpoint of the page that does not need route parameters.
-     */
     protected function endpointUrls(): array
     {
         $feature = $this->feature();
@@ -108,8 +97,7 @@ abstract class PageController
     }
 
     /**
-     * Some responses only flash a notification and return nothing, which
-     * means "stay on the page".
+     * A response that returns nothing means "stay on the page".
      */
     protected function respond(mixed $response, Request $request)
     {

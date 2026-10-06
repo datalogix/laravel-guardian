@@ -41,6 +41,9 @@ class TwoFactorSetup extends Page
     public ?string $qrSvg = null;
 
     #[Locked]
+    public bool $canDisable = false;
+
+    #[Locked]
     public bool $canManageRecoveryCodes = false;
 
     #[Locked]
@@ -113,10 +116,11 @@ class TwoFactorSetup extends Page
 
             $wasPendingSetup = Guardian::hasPendingTwoFactorSetup();
 
-            $data = $this->validate(EnableTwoFactor::rules());
+            $action = app(EnableTwoFactor::class);
+            $data = $this->validate($action::rules());
 
             try {
-                $this->recoveryCodes = app(EnableTwoFactor::class)($user, $data);
+                $this->recoveryCodes = $action($user, $data);
             } catch (PasswordConfirmationException $exception) {
                 return $this->setup()->redirectToPasswordConfirmation($exception);
             }
@@ -218,6 +222,7 @@ class TwoFactorSetup extends Page
 
         $this->enabled = $summary['enabled'];
         $this->secretUnreadable = $summary['secretUnreadable'];
+        $this->canDisable = $summary['canDisable'];
 
         if (! $this->enabled || $this->secretUnreadable) {
             $this->resetTwoFactorRecoveryState();
@@ -229,7 +234,7 @@ class TwoFactorSetup extends Page
 
         if ($this->canManageRecoveryCodes) {
             if (! $this->recoveryCodesFreshlyGenerated) {
-                $this->recoveryCodes = $summary['recoveryCodes'];
+                $this->recoveryCodes = [];
             }
 
             $this->recoveryCodesCount = $summary['recoveryCodesCount'];

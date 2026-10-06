@@ -3,7 +3,9 @@
 namespace Datalogix\Guardian\Tests\Feature\Concerns;
 
 use Datalogix\Guardian\Actions\EnableTwoFactor;
+use Datalogix\Guardian\Actions\Login;
 use Datalogix\Guardian\Actions\PrepareTwoFactorSetup;
+use Datalogix\Guardian\Enums\AuthFlowResult;
 use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Tests\Attributes\WithFortresses;
@@ -58,12 +60,53 @@ class HasTwoFactorRequirementLogicTest extends TestCase
         $user = $this->createUser();
         $this->enableTwoFactorFor($user);
 
-        // Even though two-factor is enabled for this user, the custom policy
-        // unconditionally opts them out of the challenge.
         $fortress = Fortress::make()->basic()->twoFactor(requireWhen: fn ($user, $fortress, $isEnabled) => false);
         Guardian::setCurrentFortress($fortress);
 
         $this->assertFalse(Guardian::requiresTwoFactorChallenge($user->fresh()));
+    }
+
+    public function test_a_policy_requiring_two_factor_sends_a_user_without_it_to_set_it_up(): void
+    {
+        $user = $this->createUser();
+
+        $fortress = Fortress::make()->basic()->twoFactor(requireWhen: fn ($user, $fortress, $isEnabled) => true);
+        Guardian::setCurrentFortress($fortress);
+
+        // There is no code to ask for yet, so a challenge could never be passed.
+        $this->assertFalse(Guardian::requiresTwoFactorChallenge($user));
+        $this->assertTrue(Guardian::requiresTwoFactorSetup($user));
+    }
+
+    public function test_a_policy_requiring_two_factor_challenges_a_user_with_it(): void
+    {
+        $user = $this->createUser();
+        $this->enableTwoFactorFor($user);
+
+        $fortress = Fortress::make()->basic()->twoFactor(requireWhen: fn ($user, $fortress, $isEnabled) => true);
+        Guardian::setCurrentFortress($fortress);
+
+        $this->assertTrue(Guardian::requiresTwoFactorChallenge($user->fresh()));
+        $this->assertFalse(Guardian::requiresTwoFactorSetup($user->fresh()));
+    }
+
+    public function test_a_policy_leaving_the_decision_does_not_require_setup(): void
+    {
+        $fortress = Fortress::make()->basic()->twoFactor(requireWhen: fn ($user, $fortress, $isEnabled) => null);
+        Guardian::setCurrentFortress($fortress);
+
+        $this->assertFalse(Guardian::requiresTwoFactorSetup($this->createUser()));
+    }
+
+    public function test_a_user_required_by_policy_signs_in_through_the_setup(): void
+    {
+        $user = $this->createUser(['password' => bcrypt('secret')]);
+
+        $fortress = Fortress::make()->basic()->twoFactor(requireWhen: fn ($user, $fortress, $isEnabled) => true);
+        Guardian::setCurrentFortress($fortress);
+
+        $this->assertSame(AuthFlowResult::SetupRequired, app(Login::class)(['login' => $user->email, 'password' => 'secret']));
+        $this->assertFalse(Guardian::isAuthenticated());
     }
 
     public function test_a_recently_confirmed_grace_period_skips_the_challenge(): void
@@ -88,11 +131,7 @@ class HasTwoFactorRequirementLogicTest extends TestCase
 
     public function test_the_grace_period_does_not_apply_without_a_confirmed_at_timestamp(): void
     {
-        // A non-Model TwoFactorAuthenticatable user: TwoFactorUser's
-        // getTwoFactorConfirmedAt() only ever tracks that timestamp on Eloquent
-        // models, so isWithinTwoFactorGracePeriod() must treat the missing
-        // timestamp as "not within the grace period" rather than assuming it
-        // applies.
+        // A non-Model user has no confirmed-at timestamp.
         $user = new NonModelTwoFactorUser;
 
         $fortress = Fortress::make()->basic()->twoFactor(gracePeriodDays: 7);
@@ -109,8 +148,7 @@ class HasTwoFactorRequirementLogicTest extends TestCase
     #[WithFortresses('requiringSetupOnLogin')]
     public function test_requires_setup_is_false_when_the_user_cannot_store_a_secret(): void
     {
-        // A model with no two_factor_secret column and none of the storage
-        // contracts implemented: canStoreTwoFactorSecret() must return false.
+        // No secret column and no storage contracts.
         $user = new class extends Model implements AuthenticatableContract
         {
             use Authenticatable;

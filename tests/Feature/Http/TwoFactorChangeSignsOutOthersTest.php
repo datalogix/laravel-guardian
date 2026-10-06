@@ -16,11 +16,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use PragmaRX\Google2FA\Google2FA;
 
-/**
- * Enabling two-factor authentication is what a user does who fears someone else
- * has their password: whoever else is signed in is signed out. Disabling it signs
- * nobody out.
- */
 class TwoFactorChangeSignsOutOthersTest extends TestCase
 {
     protected function fortresses(): array
@@ -39,10 +34,7 @@ class TwoFactorChangeSignsOutOthersTest extends TestCase
     }
 
     /**
-     * Signs in the way the attacker does, with the password and "remember me", and
-     * returns the browser they would keep: the session and the cookie.
-     *
-     * @return array{0: array, 1: string}
+     * Signs in like an attacker, with the password and "remember me": returns the session and cookie they keep.
      */
     protected function signInElsewhere($user): array
     {

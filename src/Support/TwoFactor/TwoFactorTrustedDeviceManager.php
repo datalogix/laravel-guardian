@@ -15,9 +15,7 @@ class TwoFactorTrustedDeviceManager
     public function __construct(
         protected TwoFactorUser $twoFactorUser,
         protected TrustedDevices $trustedDevices,
-    ) {
-        //
-    }
+    ) {}
 
     public function remember(
         Fortress $fortress,
@@ -51,10 +49,10 @@ class TwoFactorTrustedDeviceManager
             $this->resolveSecureCookieFlag(),
             true,
             false,
-            'lax',
+            // Null follows session.same_site, like the session cookie it stands next to.
+            null,
         ));
 
-        // The events carry an Eloquent user, like every two-factor event of Guardian.
         if ($user instanceof Model) {
             event(new TwoFactorTrustedDeviceRemembered($fortress, $user, (int) $issued['id']));
         }

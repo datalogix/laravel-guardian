@@ -27,9 +27,10 @@ class OAuthCompleteRegistrationController extends PageController
 
     public function submit(Request $request)
     {
-        $data = $request->validate(CompleteOAuthRegistrationAction::rules());
+        $action = app(CompleteOAuthRegistrationAction::class);
+        $data = $request->validate($action::rules());
 
-        $result = app(CompleteOAuthRegistrationAction::class)($data);
+        $result = $action($data);
 
         return $this->respond(
             Guardian::respondToAuthFlow($result, Guardian::getOAuthFeature()->getResponse()),

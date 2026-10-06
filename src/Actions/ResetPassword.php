@@ -27,28 +27,7 @@ class ResetPassword implements HasValidationRules
 
         return $this->throttleAction(
             function () use ($credentials) {
-                $canAccess = true;
-
-                $status = Password::broker(Guardian::getPasswordBroker())->reset(
-                    $credentials,
-                    function (CanResetPassword|Model|Authenticatable $user, string $password) use (&$canAccess) {
-                        if (! $user instanceof Model || Guardian::cannotAccess($user)) {
-                            $canAccess = false;
-
-                            return;
-                        }
-
-                        $user->forceFill(['password' => Hash::make($password)]);
-                        $user->setRememberToken(Str::random(60));
-                        $user->save();
-
-                        event(new PasswordReset($user));
-                    }
-                );
-
-                if ($canAccess === false) {
-                    $status = Password::INVALID_USER;
-                }
+                $status = $this->reset($credentials);
 
                 if ($status !== Password::PASSWORD_RESET) {
                     throw ResetPasswordException::forStatus($status);
@@ -57,9 +36,34 @@ class ResetPassword implements HasValidationRules
                 return $status;
             },
             fn (int $seconds) => throw ResetPasswordException::rateLimited($seconds),
-            Str::lower($data['login'] ?? ''),
+            (string) Guardian::getIdentifierKey()->normalize($data['login'] ?? ''),
             Guardian::getResetPasswordFeature()->getMaxAttempts()
         );
+    }
+
+    protected function reset(array $credentials): string
+    {
+        $deniedAccess = false;
+
+        $status = Password::broker(Guardian::getPasswordBroker())->reset(
+            $credentials,
+            function (CanResetPassword|Model|Authenticatable $user, string $password) use (&$deniedAccess) {
+                if (! $user instanceof Model || Guardian::cannotAccess($user)) {
+                    $deniedAccess = true;
+
+                    return;
+                }
+
+                $user->forceFill(['password' => Hash::make($password)]);
+                $user->setRememberToken(Str::random(60));
+                $user->save();
+
+                event(new PasswordReset($user));
+            }
+        );
+
+        // Same answer as for an unknown user.
+        return $deniedAccess ? Password::INVALID_USER : $status;
     }
 
     public static function rules(): array

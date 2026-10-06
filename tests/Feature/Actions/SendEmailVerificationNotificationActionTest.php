@@ -42,8 +42,6 @@ class SendEmailVerificationNotificationActionTest extends TestCase
 
     public function test_it_does_nothing_when_email_verification_is_not_enabled(): void
     {
-        // A single call site can't cross fortresses, so this asserts the guard
-        // for the "verify route disabled" branch via a feature toggled off.
         Guardian::getEmailVerificationVerifyFeature()->configure(
             false, null, null, null, null, null
         );

@@ -31,10 +31,7 @@ class TrustedDevicesTest extends TestCase
 
     public function test_issue_without_a_name_falls_back_to_guessing_the_device(): void
     {
-        // Testbench's default test Request carries a "Symfony" User-Agent that
-        // matches none of guessDeviceName()'s browser/platform patterns, which
-        // also resolves to a blank name — but for a different reason than an
-        // actually-missing header, so it's cleared here to exercise that branch.
+        // Testbench's default User-Agent names nothing; cleared to test a missing header.
         $this->app['request']->headers->remove('User-Agent');
 
         $issued = $this->trustedDevices->issue($this->fortress(), $this->createUser(), 30);
@@ -80,8 +77,7 @@ class TrustedDevicesTest extends TestCase
 
     public function test_issue_without_a_name_leaves_it_empty_for_an_unrecognizable_device(): void
     {
-        // Testbench's default request carries a "Symfony" User-Agent, which names no
-        // known browser or platform.
+        // Testbench's default User-Agent names no browser or platform.
         $issued = $this->trustedDevices->issue($this->fortress(), $this->createUser(), 30);
 
         $this->assertDatabaseHas('two_factor_trusted_devices', ['id' => $issued['id'], 'name' => null]);

@@ -24,7 +24,6 @@ class OAuthCompleteRegistrationControllerTest extends InertiaTestCase
             email: 'pending@example.com',
             name: 'Pending User',
             avatar: null,
-            emailVerified: true,
         );
     }
 
@@ -51,7 +50,7 @@ class OAuthCompleteRegistrationControllerTest extends InertiaTestCase
 
         $this->inertiaPost('/oauth/complete-registration', ['login' => '529.982.247-25'])->assertRedirect();
 
-        $this->assertDatabaseHas('users', ['email' => 'pending@example.com', 'cpf' => '529.982.247-25']);
+        $this->assertDatabaseHas('users', ['email' => 'pending@example.com', 'cpf' => '52998224725']);
         $this->assertAuthenticated();
     }
 

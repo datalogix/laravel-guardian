@@ -59,9 +59,7 @@ abstract class Feature
     }
 
     /**
-     * The default action is resolved on demand, not when the feature is
-     * configured, so the framework of the fortress can still be changed
-     * after a preset like basic() enabled the feature.
+     * Resolved lazily, so the framework can still change after a preset enabled the feature.
      */
     public function getRouteAction(): string|Closure|array|false|null
     {
@@ -137,10 +135,6 @@ abstract class Feature
             ->name($this->getRouteName());
     }
 
-    /**
-     * Registers the GET route of a bundled page and, when the framework
-     * needs them, the endpoints the page submits to.
-     */
     protected function registerPageRoute(string $path, array|string $middleware = []): void
     {
         $this->registerRoute('get', $path, $middleware);

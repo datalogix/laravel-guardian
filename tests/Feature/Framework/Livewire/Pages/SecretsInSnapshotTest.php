@@ -20,8 +20,7 @@ use PHPUnit\Framework\Attributes\Group;
 use PragmaRX\Google2FA\Google2FA;
 
 /**
- * Livewire sends every public property back to the browser in the snapshot of the
- * page, so a secret the user typed must not outlive the action that used it.
+ * Livewire sends public properties back to the browser: a secret must not outlive the action.
  */
 #[Group('livewire')]
 class SecretsInSnapshotTest extends TestCase
@@ -32,7 +31,8 @@ class SecretsInSnapshotTest extends TestCase
 
     protected function fortresses(): array
     {
-        return [Fortress::make()->product()->default()->twoFactor()];
+        // With terms, so a sign-up without accepting them fails.
+        return [Fortress::make()->product()->default()->signUp(termsUrl: 'https://example.com/terms')->twoFactor()];
     }
 
     protected function userWithTwoFactor()

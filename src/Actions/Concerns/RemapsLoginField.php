@@ -2,22 +2,24 @@
 
 namespace Datalogix\Guardian\Actions\Concerns;
 
+use Datalogix\Guardian\Enums\IdentifierKey;
 use Datalogix\Guardian\Guardian;
 
 trait RemapsLoginField
 {
-    /**
-     * Remap the generic `login` form field to the fortress's real identifier column
-     * (email/username/cpf/cnpj/login), so it lands on the right model attribute
-     * and the right column when queried (credential lookup, uniqueness checks, ...).
-     */
     protected function remapLoginField(array $data, string $field = 'login'): array
     {
+        if (array_key_exists('email', $data)) {
+            $data['email'] = IdentifierKey::Email->normalize($data['email']);
+        }
+
         if (! array_key_exists($field, $data)) {
             return $data;
         }
 
-        $column = Guardian::getIdentifierKey()->value;
+        $identifierKey = Guardian::getIdentifierKey();
+        $data[$field] = $identifierKey->normalize($data[$field]);
+        $column = $identifierKey->value;
 
         if ($column === $field) {
             return $data;

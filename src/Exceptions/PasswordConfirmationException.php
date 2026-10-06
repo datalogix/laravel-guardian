@@ -37,13 +37,6 @@ class PasswordConfirmationException extends ValidationException
         ]);
     }
 
-    public static function requiredForDisconnectingOAuth(): static
-    {
-        return static::withMessages([
-            'password' => [__('Please confirm your password before disconnecting this provider.')],
-        ]);
-    }
-
     public static function rateLimited(int $seconds): static
     {
         return static::rateLimitedMessage('password', $seconds);

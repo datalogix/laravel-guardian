@@ -15,9 +15,10 @@ class ConfirmPasswordController extends PageController
 
     public function submit(Request $request)
     {
-        $data = $request->validate(ConfirmPasswordAction::rules());
+        $action = app(ConfirmPasswordAction::class);
+        $data = $request->validate($action::rules());
 
-        app(ConfirmPasswordAction::class)($data);
+        $action($data);
 
         return $this->respond(
             app(Guardian::getPasswordConfirmationFeature()->getResponse()),

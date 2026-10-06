@@ -32,7 +32,7 @@ class OAuthCallbackPendingRegistrationTest extends TestCase
 
     public function test_a_cpf_identifier_defers_to_a_pending_registration_instead_of_creating_a_user_directly(): void
     {
-        $this->mockSocialiteUser('github', ['id' => 'gh-8', 'email' => 'pending@example.com']);
+        $this->mockSocialiteUser('github', ['id' => 'gh-8', 'email' => 'pending@example.com', 'email_verified' => true]);
 
         $result = app(OAuthCallback::class)('github');
 
@@ -48,6 +48,7 @@ class OAuthCallbackPendingRegistrationTest extends TestCase
         $this->mockSocialiteUser('github', [
             'id' => 'gh-1',
             'email' => 'pending@example.com',
+            'email_verified' => true,
             'token' => 'access-token-value',
             'refreshToken' => 'refresh-token-value',
             'expiresIn' => 3600,

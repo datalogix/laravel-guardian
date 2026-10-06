@@ -50,10 +50,7 @@ abstract class Page extends Component
     }
 
     /**
-     * Livewire sends every public property back to the browser in the snapshot of
-     * the page, and the browser sends it again on every later request of the page.
-     * So what the user typed as a secret is cleared once the action used it, also
-     * when it failed.
+     * Livewire sends public properties back to the browser, so secrets are cleared after use.
      */
     protected function forgettingSecrets(Closure $action, string ...$properties): mixed
     {

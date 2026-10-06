@@ -51,10 +51,7 @@ class OAuthRedirectActionTest extends TestCase
 
     protected function enablingBitbucket(): array
     {
-        // Configured with credentials here so FortressRegistry::validate() lets the
-        // application boot; the test then removes them to exercise the runtime
-        // "enabled but not configured" guard in ResolvesOAuthProvider, separately
-        // from the boot-time FortressRegistry validation already covered elsewhere.
+        // The credentials let the app boot; removing them exercises the runtime check.
         config(['services.bitbucket' => [
             'client_id' => 'temporary',
             'client_secret' => 'temporary',

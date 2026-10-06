@@ -11,9 +11,7 @@ class OAuthPendingRegistrationManager
 {
     public function __construct(
         protected SessionState $state,
-    ) {
-        //
-    }
+    ) {}
 
     public function start(
         Fortress $fortress,
@@ -22,7 +20,6 @@ class OAuthPendingRegistrationManager
         ?string $email,
         ?string $name,
         ?string $avatar,
-        bool $emailVerified = false,
         ?string $accessToken = null,
         ?string $refreshToken = null,
         ?\DateTimeInterface $tokenExpiresAt = null,
@@ -33,7 +30,6 @@ class OAuthPendingRegistrationManager
             'email' => $email,
             'name' => $name,
             'avatar' => $avatar,
-            'email_verified' => $emailVerified,
             'access_token' => $this->encrypt($accessToken),
             'refresh_token' => $this->encrypt($refreshToken),
             'token_expires_at' => $tokenExpiresAt?->format(DATE_ATOM),
@@ -60,8 +56,7 @@ class OAuthPendingRegistrationManager
     }
 
     /**
-     * The session store keeps what it is given as it is, unless the application
-     * encrypts its sessions, so the tokens of the provider are encrypted here.
+     * Encrypted here: the session store keeps values as they are unless sessions are encrypted.
      */
     protected function encrypt(?string $token): ?string
     {

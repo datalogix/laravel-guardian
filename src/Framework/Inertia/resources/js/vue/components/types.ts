@@ -15,5 +15,4 @@ export interface TrustedDevice {
     revokeUrl: string
 }
 
-/** The validation errors Inertia shares with every page, keyed by field. */
 export type PageErrors = Record<string, string>

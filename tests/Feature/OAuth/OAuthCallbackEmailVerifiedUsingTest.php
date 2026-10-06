@@ -15,9 +15,6 @@ use Datalogix\Guardian\Tests\TestCase;
 use Illuminate\Support\Facades\Log;
 use PHPUnit\Framework\Attributes\Group;
 
-/**
- * When the application says how to decide whether an e-mail is verified, it decides.
- */
 #[Group('socialite')]
 class OAuthCallbackEmailVerifiedUsingTest extends TestCase
 {
@@ -64,8 +61,7 @@ class OAuthCallbackEmailVerifiedUsingTest extends TestCase
     {
         $existing = $this->createUser(['email' => 'closure@example.com']);
 
-        // No raw "email_verified"-like key present, so isOAuthEmailVerified() falls
-        // through to the configured emailVerifiedUsing closure.
+        // No verified claim: the closure decides.
         $this->mockSocialiteUser('github', ['id' => 'gh-1', 'email' => 'closure@example.com', 'nickname' => 'trusted']);
 
         $result = app(OAuthCallback::class)('github');
@@ -147,17 +143,23 @@ class OAuthCallbackEmailVerifiedUsingTest extends TestCase
     }
 
     #[WithFortresses('decidingPerProvider')]
-    public function test_a_new_user_is_marked_verified_according_to_its_own_provider(): void
+    public function test_a_new_user_is_created_only_when_its_own_provider_verified_the_email(): void
     {
         $this->mockSocialiteUser('discord', ['id' => 'dc-2', 'email' => 'new-discord@example.com', 'verified' => true]);
         app(OAuthCallback::class)('discord');
         $this->app['auth']->guard()->logout();
 
-        $this->mockSocialiteUser('github', ['id' => 'gh-3', 'email' => 'new-github@example.com', 'verified' => true]);
-        app(OAuthCallback::class)('github');
-
         $this->assertNotNull(User::whereEmail('new-discord@example.com')->firstOrFail()->email_verified_at);
-        $this->assertNull(User::whereEmail('new-github@example.com')->firstOrFail()->email_verified_at);
+
+        // The same claim means nothing for GitHub, so its e-mail is not taken as verified.
+        $this->mockSocialiteUser('github', ['id' => 'gh-3', 'email' => 'new-github@example.com', 'verified' => true]);
+
+        try {
+            app(OAuthCallback::class)('github');
+            $this->fail('An account was created for an e-mail the provider did not verify.');
+        } catch (OAuthException) {
+            $this->assertDatabaseMissing('users', ['email' => 'new-github@example.com']);
+        }
     }
 
     #[WithFortresses('decidingPerProvider')]

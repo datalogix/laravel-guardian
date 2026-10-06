@@ -28,10 +28,7 @@ trait MocksSocialite
     {
         $user = new class($id, $email) implements ProviderUser
         {
-            public function __construct(protected string $id, protected string $email)
-            {
-                //
-            }
+            public function __construct(protected string $id, protected string $email) {}
 
             public function getId()
             {

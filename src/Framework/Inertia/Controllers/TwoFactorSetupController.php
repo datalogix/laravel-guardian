@@ -19,9 +19,6 @@ class TwoFactorSetupController extends PageController
 {
     use RedirectsToTwoFactorSetup;
 
-    /**
-     * Flashed for the request that follows an enable / regenerate, so the codes are shown once.
-     */
     public const RECOVERY_CODES_FLASH = 'guardian.two_factor_setup.recovery_codes';
 
     public const AWAITING_CONTINUE_FLASH = 'guardian.two_factor_setup.awaiting_continue';
@@ -64,13 +61,14 @@ class TwoFactorSetupController extends PageController
         return [
             'enabled' => $state['enabled'],
             'secretUnreadable' => $state['secretUnreadable'],
+            'canDisable' => $state['canDisable'],
             'method' => ($pending['method'] ?? $this->setup()->method())->value,
             'secret' => $pending['secret'] ?? null,
             'uri' => $pending['uri'] ?? null,
             'qrSvg' => $pending['qrSvg'] ?? null,
             'canManageRecoveryCodes' => $state['canManageRecoveryCodes'],
             'recoveryCodesCount' => $state['recoveryCodesCount'],
-            'recoveryCodes' => session(self::RECOVERY_CODES_FLASH) ?? $state['recoveryCodes'],
+            'recoveryCodes' => session(self::RECOVERY_CODES_FLASH) ?? [],
             'trustedDevices' => $this->trustedDevices($state['trustedDevices']),
             'awaitingContinueAfterSetup' => (bool) session(self::AWAITING_CONTINUE_FLASH, false),
         ];
@@ -103,10 +101,11 @@ class TwoFactorSetupController extends PageController
 
         $wasPendingSetup = Guardian::hasPendingTwoFactorSetup();
 
-        $data = $request->validate(EnableTwoFactor::rules());
+        $action = app(EnableTwoFactor::class);
+        $data = $request->validate($action::rules());
 
         try {
-            $recoveryCodes = app(EnableTwoFactor::class)($user, $data);
+            $recoveryCodes = $action($user, $data);
         } catch (PasswordConfirmationException $exception) {
             return $this->setup()->redirectToPasswordConfirmation($exception);
         }

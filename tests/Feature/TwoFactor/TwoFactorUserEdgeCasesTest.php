@@ -7,11 +7,14 @@ use Datalogix\Guardian\Support\TwoFactor\TwoFactorUser;
 use Datalogix\Guardian\Tests\Fixtures\BadConnectionUser;
 use Datalogix\Guardian\Tests\Fixtures\ContractTwoFactorUser;
 use Datalogix\Guardian\Tests\Fixtures\NonModelTwoFactorUser;
+use Datalogix\Guardian\Tests\Fixtures\OtherConnectionAdmin;
 use Datalogix\Guardian\Tests\Fixtures\SecretOnlyTwoFactorUser;
 use Datalogix\Guardian\Tests\TestCase;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Schema;
 
 class TwoFactorUserEdgeCasesTest extends TestCase
@@ -101,6 +104,20 @@ class TwoFactorUserEdgeCasesTest extends TestCase
         $this->assertFalse($this->manager->consumeTwoFactorRecoveryCode($user->fresh(), $this->fortress(), '   '));
     }
 
+    protected function hashed(string $code): string
+    {
+        return 'sha256:'.hash('sha256', strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $code)));
+    }
+
+    public function test_a_recovery_code_stored_as_it_is_is_not_accepted(): void
+    {
+        // Guardian only stores hashes: a code kept as it is was not stored by it.
+        $user = $this->createUser();
+        DB::table('users')->where('id', $user->id)->update(['two_factor_recovery_codes' => json_encode(['plain-code'])]);
+
+        $this->assertFalse($this->manager->consumeTwoFactorRecoveryCode($user->fresh(), $this->fortress(), 'plain-code'));
+    }
+
     public function test_consume_recovery_code_via_the_contract_based_non_locked_path(): void
     {
         $user = new ContractTwoFactorUser(['name' => 'X', 'email' => 'contract-consume@example.com', 'password' => 'x']);
@@ -108,8 +125,11 @@ class TwoFactorUserEdgeCasesTest extends TestCase
 
         $this->manager->saveTwoFactorRecoveryCodes($user, $this->fortress(), ['alpha-code', 'beta-code']);
 
+        // The model is given the hashes, like the column would keep them.
+        $this->assertSame([$this->hashed('alpha-code'), $this->hashed('beta-code')], $user->getTwoFactorRecoveryCodes($this->fortress()));
+
         $this->assertTrue($this->manager->consumeTwoFactorRecoveryCode($user, $this->fortress(), 'alpha-code'));
-        $this->assertSame(['beta-code'], $this->manager->getTwoFactorRecoveryCodes($user, $this->fortress()));
+        $this->assertSame([$this->hashed('beta-code')], $user->getTwoFactorRecoveryCodes($this->fortress()));
 
         $this->assertFalse($this->manager->consumeTwoFactorRecoveryCode($user, $this->fortress(), 'not-a-code'));
     }
@@ -119,7 +139,6 @@ class TwoFactorUserEdgeCasesTest extends TestCase
         $user = $this->createUser();
         DB::table('users')->where('id', $user->id)->update(['two_factor_recovery_codes' => 'not-json']);
 
-        $this->assertSame([], $this->manager->getTwoFactorRecoveryCodes($user->fresh(), $this->fortress()));
         $this->assertSame(0, $this->manager->getTwoFactorRecoveryCodesCount($user->fresh(), $this->fortress()));
     }
 
@@ -127,7 +146,7 @@ class TwoFactorUserEdgeCasesTest extends TestCase
     {
         $user = $this->createUser();
         DB::table('users')->where('id', $user->id)->update([
-            'two_factor_recovery_codes' => json_encode(['', null, 123, 'sha256:abcnotarealmatch', 'real-code']),
+            'two_factor_recovery_codes' => json_encode(['', null, 123, 'sha256:abcnotarealmatch', $this->hashed('real-code')]),
         ]);
 
         $this->assertTrue($this->manager->consumeTwoFactorRecoveryCode($user->fresh(), $this->fortress(), 'real-code'));
@@ -152,8 +171,7 @@ class TwoFactorUserEdgeCasesTest extends TestCase
         $this->assertTrue($this->manager->hasTwoFactorEnabled($user, $this->fortress()));
         $this->assertSame('a-secret-value', $this->manager->getTwoFactorSecret($user, $this->fortress()));
 
-        // Calling it twice exercises the resolved-secret cache keyed by
-        // spl_object_id() instead of a Model primary key.
+        // Twice: the resolved-secret cache is keyed by spl_object_id() for non-models.
         $this->assertSame('a-secret-value', $this->manager->getTwoFactorSecret($user, $this->fortress()));
     }
 
@@ -182,8 +200,7 @@ class TwoFactorUserEdgeCasesTest extends TestCase
 
     public function test_consume_recovery_code_with_lock_returns_false_when_the_row_was_deleted(): void
     {
-        // Simulates the row being deleted between the caller obtaining the
-        // user instance and the locked re-fetch inside the transaction.
+        // The row is deleted before the locked re-fetch.
         $user = $this->createUser();
         $this->manager->saveTwoFactorRecoveryCodes($user, $this->fortress(), ['alpha-code']);
 
@@ -203,6 +220,33 @@ class TwoFactorUserEdgeCasesTest extends TestCase
         $this->assertTrue($manager->canStoreTwoFactorSecret($user));
         $this->assertFalse($manager->canStoreTwoFactorRecoveryCodes($user));
         $this->assertTrue($manager->hasTwoFactorEnabled($user, $fortress));
-        $this->assertSame([], $manager->getTwoFactorRecoveryCodes($user, $fortress));
+        $this->assertSame(0, $manager->getTwoFactorRecoveryCodesCount($user, $fortress));
+    }
+
+    public function test_a_recovery_code_is_consumed_in_a_transaction_of_the_connection_of_the_user(): void
+    {
+        config(['database.connections.admins' => ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']]);
+
+        Schema::connection('admins')->create('admins', function ($table) {
+            $table->id();
+            $table->text('two_factor_recovery_codes')->nullable();
+        });
+
+        $admin = new class extends OtherConnectionAdmin
+        {
+            public $timestamps = false;
+        };
+        $admin->save();
+        $this->manager->saveTwoFactorRecoveryCodes($admin, $this->fortress(), ['recovery-code-1']);
+
+        $connections = [];
+        Event::listen(TransactionBeginning::class, function (TransactionBeginning $event) use (&$connections) {
+            $connections[] = $event->connectionName;
+        });
+
+        $this->assertTrue($this->manager->consumeTwoFactorRecoveryCode($admin, $this->fortress(), 'recovery-code-1'));
+
+        // The row is locked for update, which only holds inside a transaction of its own connection.
+        $this->assertSame(['admins'], $connections);
     }
 }

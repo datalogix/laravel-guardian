@@ -6,15 +6,14 @@ use Closure;
 use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Guardian;
 use Illuminate\Auth\Events\Lockout;
+use Illuminate\Cache\RateLimiter as CacheRateLimiter;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\RateLimiter;
 
 trait HasRateLimiter
 {
     /**
-     * Counts the attempt before it is made, and stops it past the limit. Counting
-     * first, with the count the cache returns atomically, is what holds attempts
-     * sent at the same time: checking first would let them all through before any
-     * of them was counted. An attempt that succeeds clears the count.
+     * Counted before the attempt, atomically, so concurrent attempts cannot all slip under the limit.
      */
     protected function reserveAttempt(string $throttleKey, int|false|null $maxAttempts, Closure $onLockout, ?int $decaySeconds = null): mixed
     {
@@ -22,19 +21,19 @@ trait HasRateLimiter
             return null;
         }
 
-        if (RateLimiter::hit($throttleKey, $decaySeconds ?? 60) <= $maxAttempts) {
+        if ($this->rateLimiter()->hit($throttleKey, $decaySeconds ?? 60) <= $maxAttempts) {
             return null;
         }
 
         event(new Lockout(request()));
 
-        return $onLockout(RateLimiter::availableIn($throttleKey));
+        return $onLockout($this->rateLimiter()->availableIn($throttleKey));
     }
 
     protected function clearRateLimiterIfThrottled(string $throttleKey, int|false|null $maxAttempts): void
     {
         if ($this->shouldThrottle($maxAttempts)) {
-            RateLimiter::clear($throttleKey);
+            $this->rateLimiter()->clear($throttleKey);
         }
     }
 
@@ -65,19 +64,26 @@ trait HasRateLimiter
 
         $throttleKey = $this->throttleKey($key, $includeIp);
 
-        if (RateLimiter::hit($throttleKey) > $maxAttempts) {
+        if ($this->rateLimiter()->hit($throttleKey) > $maxAttempts) {
             event(new Lockout(request()));
 
-            return $onLockout(RateLimiter::availableIn($throttleKey));
+            return $onLockout($this->rateLimiter()->availableIn($throttleKey));
         }
 
         $result = $callback();
 
         if ($clearOnSuccess) {
-            RateLimiter::clear($throttleKey);
+            $this->rateLimiter()->clear($throttleKey);
         }
 
         return $result ?? true;
+    }
+
+    protected function rateLimiter(): CacheRateLimiter
+    {
+        $store = config('guardian.cache_store');
+
+        return $store === null ? RateLimiter::getFacadeRoot() : new CacheRateLimiter(Cache::store($store));
     }
 
     protected function shouldThrottle(int|false|null $maxAttempts): bool
@@ -85,10 +91,6 @@ trait HasRateLimiter
         return is_int($maxAttempts) && $maxAttempts > 0;
     }
 
-    /**
-     * Scoped to the fortress and its guard: fortresses may have users of their own,
-     * with the same IDs or logins, whose attempts must not count against each other.
-     */
     protected function throttleKey(?string $key = null, bool $includeIp = true): string
     {
         $fortress = $this->throttledFortress();

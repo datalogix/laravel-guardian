@@ -6,8 +6,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\UserProvider;
 
 /**
- * A UserProvider without getModel(), unlike EloquentUserProvider, to exercise
- * HasAuth::authModelClass()'s own UnsupportedAuthGuardException branch.
+ * A user provider without getModel().
  */
 class BareUserProvider implements UserProvider
 {
@@ -21,10 +20,7 @@ class BareUserProvider implements UserProvider
         return null;
     }
 
-    public function updateRememberToken(Authenticatable $user, #[\SensitiveParameter] $token): void
-    {
-        //
-    }
+    public function updateRememberToken(Authenticatable $user, #[\SensitiveParameter] $token): void {}
 
     public function retrieveByCredentials(#[\SensitiveParameter] array $credentials): ?Authenticatable
     {
@@ -36,8 +32,5 @@ class BareUserProvider implements UserProvider
         return false;
     }
 
-    public function rehashPasswordIfRequired(Authenticatable $user, #[\SensitiveParameter] array $credentials, bool $force = false): void
-    {
-        //
-    }
+    public function rehashPasswordIfRequired(Authenticatable $user, #[\SensitiveParameter] array $credentials, bool $force = false): void {}
 }

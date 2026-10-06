@@ -31,9 +31,10 @@ class TwoFactorChallenge extends Page
     public function submit()
     {
         return $this->forgettingSecrets(function () {
-            $data = $this->validate(ConfirmTwoFactorChallengeAction::rules());
+            $action = app(ConfirmTwoFactorChallengeAction::class);
+            $data = $this->validate($action::rules());
 
-            $result = app(ConfirmTwoFactorChallengeAction::class)($data);
+            $result = $action($data);
 
             return Guardian::respondToAuthFlow($result, Guardian::getLoginFeature()->getResponse());
         }, 'code');

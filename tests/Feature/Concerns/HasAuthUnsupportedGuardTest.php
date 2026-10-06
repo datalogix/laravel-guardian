@@ -18,10 +18,7 @@ class HasAuthUnsupportedGuardTest extends TestCase
         Auth::extend('bare', fn () => new BareGuard);
         config(['auth.guards.bare' => ['driver' => 'bare']]);
 
-        // A standalone, unregistered Fortress: this exercises HasAuth's own
-        // exception branches directly, without involving FortressRegistry's
-        // boot-time validation (which would otherwise fail to boot the whole
-        // application for a guard that can't resolve a user provider).
+        // Not registered: the boot-time validation would reject this guard.
         return Fortress::make()->guard('bare');
     }
 
@@ -56,8 +53,6 @@ class HasAuthUnsupportedGuardTest extends TestCase
 
         $fortress = Fortress::make()->guard('bare-with-provider');
 
-        // This guard resolves a provider fine, so authProvider() succeeds;
-        // only authModelClass()'s own getModel() check should fail.
         $this->assertNotNull($fortress->authProvider());
 
         $this->expectException(UnsupportedAuthGuardException::class);
@@ -74,8 +69,7 @@ class HasAuthUnsupportedGuardTest extends TestCase
         $fortress = Fortress::make()->basic()->twoFactor()->guard('bare');
         Guardian::setCurrentFortress($fortress);
 
-        // A pending challenge session exists, but resolving the user needs
-        // authProvider()->retrieveById(), which this guard cannot supply.
+        // The pending user cannot be resolved without a provider.
         Guardian::startTwoFactorChallenge($this->createUser());
 
         $this->assertNull(Guardian::getPendingTwoFactorChallengeUser());

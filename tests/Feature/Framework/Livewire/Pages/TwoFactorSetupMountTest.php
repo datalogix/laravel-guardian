@@ -17,9 +17,6 @@ use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\Group;
 use PragmaRX\Google2FA\Google2FA;
 
-/**
- * What the setup page shows when it is opened, from the state already stored.
- */
 #[Group('livewire')]
 class TwoFactorSetupMountTest extends TestCase
 {
@@ -58,10 +55,7 @@ class TwoFactorSetupMountTest extends TestCase
     {
         $this->enableTwoFactorFor($this->signIn());
 
-        // A fresh mount (not the same component instance that just called
-        // enable()), so recoveryCodesFreshlyGenerated starts false and
-        // syncState() reads the stored recovery codes back through
-        // TwoFactorUser instead of using the in-memory freshly-generated set.
+        // A fresh mount reads the codes back from storage.
         $component = Livewire::test(TwoFactorSetup::class)->assertOk();
 
         $this->assertTrue($component->get('enabled'));
@@ -72,7 +66,6 @@ class TwoFactorSetupMountTest extends TestCase
 
     public function test_remounting_with_a_pending_totp_setup_rebuilds_its_qr_code(): void
     {
-        // Prepares (and leaves pending, without enabling) the default TOTP setup.
         app(PrepareTwoFactorSetup::class)($this->signIn());
 
         $component = Livewire::test(TwoFactorSetup::class)->assertOk();
@@ -88,7 +81,6 @@ class TwoFactorSetupMountTest extends TestCase
     {
         Notification::fake();
 
-        // Prepares (and leaves pending, without enabling) an Email-method setup.
         app(PrepareTwoFactorSetup::class)($this->signIn(), TwoFactorMethod::Email);
 
         $component = Livewire::test(TwoFactorSetup::class)->assertOk();
@@ -107,21 +99,13 @@ class TwoFactorSetupMountTest extends TestCase
 
         DB::table('users')->where('id', $user->id)->update(['two_factor_secret' => 'not-encrypted-data']);
 
-        // TwoFactorUser is a scoped (per-request) singleton; within a single
-        // test method it would otherwise still be holding the secret it
-        // decrypted a moment ago via EnableTwoFactor, masking the corruption
-        // simulated above. A fresh instance mirrors a genuinely new request.
+        // TwoFactorUser is scoped: a fresh one, like a new request, does not hold the old secret.
         $this->app->forgetInstance(TwoFactorUser::class);
 
-        // actingAs() also pinned the pre-corruption in-memory user instance;
-        // Guardian::user() would otherwise keep returning its stale attributes.
+        // actingAs() pinned the user from before the corruption.
         $this->actingAs($user->fresh());
 
-        // mount() is exercised directly (not through Livewire::test(), which
-        // always renders the Blade view too) since this package's bundled
-        // "tk:" components require the optional tallkit UI package that this
-        // dev environment doesn't install; only the PHP-side state syncing is
-        // under test here, not the view markup.
+        // mount() directly: rendering the view needs the optional tallkit package.
         $component = new TwoFactorSetup;
         $component->mount();
 
@@ -137,11 +121,7 @@ class TwoFactorSetupMountTest extends TestCase
         $this->app['auth']->guard()->logout();
         session()->flush();
 
-        // A pending-setup session for a user that already has two-factor
-        // enabled: resolveSetupUser() resolves it via the pending session
-        // (since Guardian::user() is null), so syncState() proceeds past its
-        // "enabled" check, but syncTrustedDevices() separately reads
-        // Guardian::user() directly, which is still null.
+        // A pending setup of a user who has two-factor: Guardian::user() is still null.
         Guardian::startPendingTwoFactorSetup($user->fresh(), remember: false);
 
         // mount() is exercised directly, for the same reason as above.

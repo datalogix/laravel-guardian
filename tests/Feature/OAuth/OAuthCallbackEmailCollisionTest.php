@@ -15,11 +15,6 @@ use Illuminate\Support\Facades\Log;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 
-/**
- * An e-mail from the provider that already belongs to an account. Without a
- * closure of its own, the application only trusts the claims of the provider
- * that say the e-mail is verified.
- */
 #[Group('socialite')]
 class OAuthCallbackEmailCollisionTest extends TestCase
 {
@@ -121,8 +116,7 @@ class OAuthCallbackEmailCollisionTest extends TestCase
 
     public function test_a_refusal_because_of_an_ignored_verified_claim_tells_what_to_configure(): void
     {
-        // An application that relied on a "verified" claim sees its users
-        // refused, so the refusal says why in the log.
+        // The log says why the user was refused.
         Log::spy();
 
         $this->refusedWith(['verified' => true]);
@@ -185,8 +179,7 @@ class OAuthCallbackEmailCollisionTest extends TestCase
     #[WithFortresses('withoutAutoLinking')]
     public function test_a_verified_email_is_not_linked_when_auto_linking_is_off(): void
     {
-        // Linking by e-mail can be switched off even with the LinkExisting
-        // policy, and then a verified e-mail is not enough.
+        // Linking by e-mail switched off: a verified e-mail is not enough.
         Log::spy();
 
         $this->refusedWith(['email_verified' => true]);

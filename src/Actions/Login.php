@@ -13,23 +13,21 @@ use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Validated;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 use Illuminate\Support\Timebox;
 
 class Login implements HasValidationRules
 {
     use Concerns\HasRateLimiter;
+    use Concerns\RemapsLoginField;
 
     public function __construct(
         protected PostAuthenticationFlow $postAuthenticationFlow,
-    ) {
-        //
-    }
+    ) {}
 
     public function __invoke(array $data = [], bool $remember = true): AuthFlowResult
     {
         $maxAttempts = Guardian::getLoginFeature()->getMaxAttempts();
-        $throttleKey = $this->throttleKey(Str::lower($data['login'] ?? ''));
+        $throttleKey = $this->throttleKey((string) Guardian::getIdentifierKey()->normalize($data['login'] ?? ''));
 
         $this->reserveAttempt(
             $throttleKey,
@@ -37,7 +35,7 @@ class Login implements HasValidationRules
             fn (int $seconds) => throw LoginException::rateLimited($seconds)
         );
 
-        $credentials = $this->parseCredentials($data);
+        $credentials = $this->remapLoginField(['login' => $data['login'], 'password' => $data['password']]);
         $guardName = Guardian::getGuard();
 
         event(new Attempting($guardName, $credentials, $remember));
@@ -76,14 +74,6 @@ class Login implements HasValidationRules
 
             return $user;
         }, config('auth.timebox_duration', 200000));
-    }
-
-    protected function parseCredentials(array $data = []): array
-    {
-        return [
-            Guardian::getIdentifierKey()->value => $data['login'],
-            'password' => $data['password'],
-        ];
     }
 
     public static function rules(): array

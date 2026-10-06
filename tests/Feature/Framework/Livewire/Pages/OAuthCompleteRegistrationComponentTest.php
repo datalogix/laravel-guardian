@@ -27,7 +27,6 @@ class OAuthCompleteRegistrationComponentTest extends TestCase
             email: 'pending@example.com',
             name: 'Pending User',
             avatar: null,
-            emailVerified: true,
         );
     }
 
@@ -46,7 +45,7 @@ class OAuthCompleteRegistrationComponentTest extends TestCase
             ->set('login', '529.982.247-25')
             ->call('submit');
 
-        $this->assertDatabaseHas('users', ['email' => 'pending@example.com', 'cpf' => '529.982.247-25']);
+        $this->assertDatabaseHas('users', ['email' => 'pending@example.com', 'cpf' => '52998224725']);
         $this->assertTrue(Guardian::isAuthenticated());
     }
 

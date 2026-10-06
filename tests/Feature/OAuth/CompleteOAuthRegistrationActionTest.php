@@ -9,6 +9,7 @@ use Datalogix\Guardian\Exceptions\OAuthException;
 use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\OAuth\OAuthIdentities;
+use Datalogix\Guardian\Tests\Fixtures\User;
 use Datalogix\Guardian\Tests\TestCase;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +33,6 @@ class CompleteOAuthRegistrationActionTest extends TestCase
             email: 'pending-user@example.com',
             name: 'Pending User',
             avatar: null,
-            emailVerified: true,
         );
     }
 
@@ -51,7 +51,9 @@ class CompleteOAuthRegistrationActionTest extends TestCase
         $result = app(CompleteOAuthRegistration::class)(['login' => '529.982.247-25']);
 
         $this->assertSame(AuthFlowResult::Authenticated, $result);
-        $this->assertDatabaseHas('users', ['email' => 'pending-user@example.com', 'cpf' => '529.982.247-25']);
+        $this->assertDatabaseHas('users', ['email' => 'pending-user@example.com', 'cpf' => '52998224725']);
+        // The sign-up only waited for an e-mail the provider verified.
+        $this->assertNotNull(User::whereEmail('pending-user@example.com')->firstOrFail()->email_verified_at);
         $this->assertDatabaseHas('oauth_identities', ['provider_user_id' => 'gh-100']);
         $this->assertTrue(Guardian::isAuthenticated());
         $this->assertFalse(Guardian::hasPendingOAuthRegistration());
@@ -65,7 +67,6 @@ class CompleteOAuthRegistrationActionTest extends TestCase
             email: 'with-tokens@example.com',
             name: 'Token User',
             avatar: null,
-            emailVerified: true,
             accessToken: 'access-token-value',
             refreshToken: 'refresh-token-value',
             tokenExpiresAt: now()->addHour(),
@@ -90,17 +91,13 @@ class CompleteOAuthRegistrationActionTest extends TestCase
 
     public function test_a_query_exception_while_linking_the_identity_is_translated_into_identity_already_linked(): void
     {
-        // OAuthIdentities::link() already prevents duplicate links with its
-        // own proactive checks; this exercises the action's translation of a
-        // genuine concurrent-insert failure into a proper OAuthException,
-        // without touching that race-prevention logic itself.
+        // A concurrent insert that the checks of link() cannot catch.
         Guardian::startPendingOAuthRegistration(
             provider: 'github',
             providerUserId: 'gh-200',
             email: 'race@example.com',
             name: 'Race User',
             avatar: null,
-            emailVerified: true,
         );
 
         $identities = Mockery::mock(OAuthIdentities::class);

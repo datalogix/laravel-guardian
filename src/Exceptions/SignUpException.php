@@ -26,9 +26,6 @@ class SignUpException extends ValidationException
         ]);
     }
 
-    /**
-     * The user did nothing wrong: the application could not create the account.
-     */
     public static function unableToRegister(): static
     {
         return static::withMessages(['login' => [__('We could not create your account. Please try again later.')]]);

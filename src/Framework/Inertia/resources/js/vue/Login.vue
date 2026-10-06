@@ -25,7 +25,6 @@ const props = defineProps<{
 const identifier = identifierField(props.identifierKey, t)
 const form = useForm({ login: '', password: '', remember: false })
 
-// A refused social sign-in redirects here with the reason in the shared errors.
 const page = usePage<{ errors: PageErrors }>()
 const providerError = computed(() => page.props.errors?.oauth)
 

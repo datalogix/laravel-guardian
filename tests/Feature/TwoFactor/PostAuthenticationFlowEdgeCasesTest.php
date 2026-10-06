@@ -35,8 +35,7 @@ class PostAuthenticationFlowEdgeCasesTest extends TestCase
         $this->app['auth']->guard()->logout();
         session()->flush();
 
-        // First login starts (and delivers) the challenge, consuming the one
-        // allowed resend/start attempt for this fortress.
+        // The first login uses the one allowed send.
         app(Login::class)(['login' => $user->email, 'password' => 'secret123']);
 
         Guardian::clearTwoFactorChallenge();
@@ -54,10 +53,7 @@ class PostAuthenticationFlowEdgeCasesTest extends TestCase
 
     protected function requiringSetupWithoutChallenge(): array
     {
-        // Challenge disabled but setup required: requiresTwoFactorChallenge()
-        // short-circuits on the disabled feature without touching the secret,
-        // so the corrupted-secret exception only surfaces from
-        // requiresTwoFactorSetup()'s own hasTwoFactorEnabled() check.
+        // Challenge disabled: the unreadable secret only surfaces from the setup check.
         return [Fortress::make()->basic()->twoFactor(challengeRouteAction: false, requireSetupOnLogin: true)];
     }
 

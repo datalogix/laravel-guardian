@@ -7,6 +7,7 @@ use Datalogix\Guardian\Actions\Concerns\HasEmailVerifiedColumn;
 use Datalogix\Guardian\Actions\Concerns\HasRateLimiter;
 use Datalogix\Guardian\Actions\Contracts\HasValidationRules;
 use Datalogix\Guardian\Enums\AuthFlowResult;
+use Datalogix\Guardian\Enums\IdentifierKey;
 use Datalogix\Guardian\Exceptions\OAuthException;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\Support\Auth\PostAuthenticationFlow;
@@ -15,7 +16,6 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 
 class CompleteOAuthRegistration implements HasValidationRules
 {
@@ -26,9 +26,7 @@ class CompleteOAuthRegistration implements HasValidationRules
     public function __construct(
         protected PostAuthenticationFlow $postAuthenticationFlow,
         protected OAuthIdentities $oauthIdentities,
-    ) {
-        //
-    }
+    ) {}
 
     public function __invoke(array $data = [], bool $remember = true): AuthFlowResult
     {
@@ -45,22 +43,21 @@ class CompleteOAuthRegistration implements HasValidationRules
 
                 $attributes = [
                     'name' => $session['name'] ?: Str::headline($session['provider']).' User',
-                    'email' => $session['email'],
+                    'email' => IdentifierKey::Email->normalize($session['email']),
                     'password' => Hash::make(Str::random(64)),
-                    $identifierKey->value => $data['login'] ?? null,
+                    $identifierKey->value => $identifierKey->normalize($data['login'] ?? null),
                 ];
 
-                if ($this->hasEmailVerifiedColumn($modelClass) && ($session['email_verified'] ?? false)) {
-                    $attributes['email_verified_at'] = now();
-                }
+                $guardianAttributes = $this->hasEmailVerifiedColumn($modelClass) ? ['email_verified_at' => now()] : [];
 
-                $user = Guardian::wrapInDatabaseTransaction(function () use ($modelClass, $attributes, $session) {
+                $user = Guardian::wrapInDatabaseTransaction(function () use ($modelClass, $attributes, $guardianAttributes, $session) {
                     $user = $this->createAuthenticatableUser(
                         $modelClass,
                         $attributes,
                         OAuthException::cannotAccess(...),
                         OAuthException::unableToAuthenticate(...),
                         OAuthException::unableToAuthenticate(...),
+                        guardianAttributes: $guardianAttributes,
                     );
 
                     try {
@@ -102,7 +99,7 @@ class CompleteOAuthRegistration implements HasValidationRules
         $identifierKey = Guardian::getIdentifierKey();
 
         return [
-            'login' => $identifierKey->rules([Rule::unique(Guardian::authModelClass(), $identifierKey->value)]),
+            'login' => $identifierKey->rules([$identifierKey->unique(Guardian::authModelClass())]),
         ];
     }
 }
