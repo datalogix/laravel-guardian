@@ -11,11 +11,11 @@ class PruneTrustedDevicesCommand extends Command
 {
     protected $description = 'Prune expired and revoked trusted two-factor devices';
 
-    protected $signature = 'guardian:prune-trusted-devices {--days=30 : Keep revoked devices for this many days before deleting}';
+    protected $signature = 'guardian:prune-trusted-devices {--days= : Keep revoked devices for this many days before deleting (defaults to guardian.prune_trusted_devices.days)}';
 
     public function handle(): int
     {
-        $days = (int) $this->option('days');
+        $days = (int) ($this->option('days') ?? config('guardian.prune_trusted_devices.days') ?? 30);
         $deleted = app(TrustedDevices::class)->prune($days);
 
         $this->info("Pruned {$deleted} trusted device record(s).");

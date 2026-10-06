@@ -7,9 +7,6 @@ use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 
-/**
- * The migrations Guardian ships roll back cleanly and can run again.
- */
 class MigrationsTest extends TestCase
 {
     protected const TWO_FACTOR_COLUMNS = ['two_factor_secret', 'two_factor_recovery_codes', 'two_factor_confirmed_at'];

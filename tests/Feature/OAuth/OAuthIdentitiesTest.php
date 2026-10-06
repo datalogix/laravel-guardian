@@ -112,33 +112,6 @@ class OAuthIdentitiesTest extends TestCase
         );
     }
 
-    public function test_unlink_removes_the_identity(): void
-    {
-        $user = $this->createUser();
-        $this->identities->link($this->fortress(), $user, 'github', 'gh-7');
-
-        $this->assertTrue($this->identities->unlink($this->fortress(), $user, 'github'));
-        $this->assertNull($this->identities->find($this->fortress(), $user, 'github'));
-    }
-
-    public function test_unlink_returns_false_when_nothing_is_linked(): void
-    {
-        $user = $this->createUser();
-
-        $this->assertFalse($this->identities->unlink($this->fortress(), $user, 'github'));
-    }
-
-    public function test_all_for_returns_every_provider_linked_to_the_user(): void
-    {
-        $user = $this->createUser();
-        $this->identities->link($this->fortress(), $user, 'github', 'gh-8');
-        $this->identities->link($this->fortress(), $user, 'gitlab', 'gl-1');
-
-        $identities = $this->identities->allFor($this->fortress(), $user);
-
-        $this->assertCount(2, $identities);
-    }
-
     public function test_link_releases_a_stale_identity_whose_class_no_longer_exists(): void
     {
         DB::table('oauth_identities')->insert([

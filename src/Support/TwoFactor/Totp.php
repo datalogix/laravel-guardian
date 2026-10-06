@@ -13,7 +13,7 @@ class Totp
 
     public function makeOtpAuthUri(string $secret, string $account, ?string $issuer = null): string
     {
-        $issuer ??= (string) config('app.name', 'Laravel');
+        $issuer ??= (string) (config('guardian.totp_issuer') ?: config('app.name', 'Laravel'));
 
         return app(Google2FA::class)->getQRCodeUrl($issuer, $account, $secret);
     }

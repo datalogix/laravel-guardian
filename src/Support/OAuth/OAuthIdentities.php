@@ -6,17 +6,31 @@ use Datalogix\Guardian\Exceptions\OAuthException;
 use Datalogix\Guardian\Fortress;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class OAuthIdentities
 {
-    protected string $table = 'oauth_identities';
+    public function table(): string
+    {
+        return config('guardian.tables.oauth_identities') ?? 'oauth_identities';
+    }
+
+    public function connectionName(): ?string
+    {
+        return config('guardian.database_connection');
+    }
+
+    protected function query(): Builder
+    {
+        return DB::connection($this->connectionName())->table($this->table());
+    }
 
     public function isAvailable(): bool
     {
-        return Schema::hasTable($this->table);
+        return Schema::connection($this->connectionName())->hasTable($this->table());
     }
 
     public function findAuthenticatableId(Fortress $fortress, string $provider, string $providerUserId, string $authenticatableType): string|int|null
@@ -25,7 +39,7 @@ class OAuthIdentities
             return null;
         }
 
-        return DB::table($this->table)
+        return $this->query()
             ->where('fortress_id', $fortress->getId())
             ->where('auth_guard', $fortress->getGuard())
             ->where('provider', $provider)
@@ -58,7 +72,7 @@ class OAuthIdentities
             'provider' => $provider,
         ];
 
-        $existingProviderUserId = DB::table($this->table)->where($lookup)->value('provider_user_id');
+        $existingProviderUserId = $this->query()->where($lookup)->value('provider_user_id');
 
         if ($existingProviderUserId !== null && (string) $existingProviderUserId !== $providerUserId) {
             throw OAuthException::identityAlreadyLinked();
@@ -68,7 +82,7 @@ class OAuthIdentities
 
         $now = now();
 
-        DB::table($this->table)->updateOrInsert(
+        $this->query()->updateOrInsert(
             $lookup,
             [
                 'provider_user_id' => $providerUserId,
@@ -87,7 +101,7 @@ class OAuthIdentities
 
     protected function releaseStaleProviderIdentity(Fortress $fortress, Model $user, string $provider, string $providerUserId): void
     {
-        $conflicting = DB::table($this->table)
+        $conflicting = $this->query()
             ->where('fortress_id', $fortress->getId())
             ->where('auth_guard', $fortress->getGuard())
             ->where('provider', $provider)
@@ -106,7 +120,7 @@ class OAuthIdentities
             throw OAuthException::identityAlreadyLinked();
         }
 
-        DB::table($this->table)->where('id', $conflicting->id)->delete();
+        $this->query()->where('id', $conflicting->id)->delete();
     }
 
     protected function authenticatableStillExists(string $type, string|int $id): bool
@@ -118,28 +132,13 @@ class OAuthIdentities
         return $type::query()->whereKey($id)->exists();
     }
 
-    public function unlink(Fortress $fortress, Model $user, string $provider): bool
-    {
-        if (! $this->isAvailable()) {
-            return false;
-        }
-
-        return DB::table($this->table)->where([
-            'fortress_id' => $fortress->getId(),
-            'auth_guard' => $fortress->getGuard(),
-            'authenticatable_type' => $user::class,
-            'authenticatable_id' => (string) $user->getAuthIdentifier(),
-            'provider' => $provider,
-        ])->delete() > 0;
-    }
-
     public function find(Fortress $fortress, Model $user, string $provider): ?array
     {
         if (! $this->isAvailable()) {
             return null;
         }
 
-        $row = DB::table($this->table)->where([
+        $row = $this->query()->where([
             'fortress_id' => $fortress->getId(),
             'auth_guard' => $fortress->getGuard(),
             'authenticatable_type' => $user::class,
@@ -148,20 +147,6 @@ class OAuthIdentities
         ])->first();
 
         return $row ? $this->hydrate($row) : null;
-    }
-
-    public function allFor(Fortress $fortress, Model $user): array
-    {
-        if (! $this->isAvailable()) {
-            return [];
-        }
-
-        return DB::table($this->table)->where([
-            'fortress_id' => $fortress->getId(),
-            'auth_guard' => $fortress->getGuard(),
-            'authenticatable_type' => $user::class,
-            'authenticatable_id' => (string) $user->getAuthIdentifier(),
-        ])->get()->map(fn ($row) => $this->hydrate($row))->all();
     }
 
     protected function hydrate(object $row): array

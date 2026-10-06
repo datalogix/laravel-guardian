@@ -14,8 +14,7 @@ class ComponentCache
     }
 
     /**
-     * The cache is only read by real requests, so that artisan commands
-     * always see the components as they are on disk.
+     * Only real requests read the cache, so artisan always sees the components on disk.
      */
     public function exists(Fortress $fortress): bool
     {

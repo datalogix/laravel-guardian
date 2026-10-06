@@ -10,11 +10,24 @@ use Illuminate\Support\Facades\Schema;
 
 class TrustedDevices
 {
-    protected string $table = 'two_factor_trusted_devices';
+    public function table(): string
+    {
+        return config('guardian.tables.two_factor_trusted_devices') ?? 'two_factor_trusted_devices';
+    }
+
+    public function connectionName(): ?string
+    {
+        return config('guardian.database_connection');
+    }
+
+    protected function query(): Builder
+    {
+        return DB::connection($this->connectionName())->table($this->table());
+    }
 
     public function isAvailable(): bool
     {
-        return Schema::hasTable($this->table);
+        return Schema::connection($this->connectionName())->hasTable($this->table());
     }
 
     public function issue(Fortress $fortress, Authenticatable $user, int $days = 30, ?string $name = null): ?array
@@ -28,7 +41,7 @@ class TrustedDevices
         $now = now();
         $expiresAt = now()->addDays(max(1, $days));
 
-        $id = DB::table($this->table)->insertGetId([
+        $id = $this->query()->insertGetId([
             ...$this->userAttributes($fortress, $user),
             'name' => $name ?? $this->guessDeviceName(),
             'ip_address' => request()->ip(),
@@ -53,7 +66,7 @@ class TrustedDevices
             return false;
         }
 
-        $record = $this->scopeForUser(DB::table($this->table)->where('id', $deviceId), $fortress, $user)
+        $record = $this->scopeForUser($this->query()->where('id', $deviceId), $fortress, $user)
             ->whereNull('revoked_at')
             ->first();
 
@@ -71,7 +84,7 @@ class TrustedDevices
             return false;
         }
 
-        DB::table($this->table)
+        $this->query()
             ->where('id', $record->id)
             ->update([
                 'last_used_at' => now(),
@@ -87,7 +100,7 @@ class TrustedDevices
             return [];
         }
 
-        return $this->scopeForUser(DB::table($this->table), $fortress, $user)
+        return $this->scopeForUser($this->query(), $fortress, $user)
             ->whereNull('revoked_at')
             ->where(function ($query) {
                 $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
@@ -104,7 +117,7 @@ class TrustedDevices
             return false;
         }
 
-        return $this->scopeForUser(DB::table($this->table)->where('id', $deviceId), $fortress, $user)
+        return $this->scopeForUser($this->query()->where('id', $deviceId), $fortress, $user)
             ->whereNull('revoked_at')
             ->update([
                 'revoked_at' => now(),
@@ -118,7 +131,7 @@ class TrustedDevices
             return 0;
         }
 
-        return $this->scopeForUser(DB::table($this->table), $fortress, $user)
+        return $this->scopeForUser($this->query(), $fortress, $user)
             ->whereNull('revoked_at')
             ->update([
                 'revoked_at' => now(),
@@ -135,7 +148,7 @@ class TrustedDevices
         $retentionDays = max(0, $retentionDays);
         $cutoff = now()->subDays($retentionDays);
 
-        return DB::table($this->table)
+        return $this->query()
             ->where(function ($query) use ($cutoff) {
                 $query->where(function ($expired) {
                     $expired->whereNotNull('expires_at')
