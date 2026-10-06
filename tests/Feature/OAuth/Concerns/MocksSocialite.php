@@ -9,9 +9,34 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 
 trait MocksSocialite
 {
+    /**
+     * SocialiteUser::fake() only exists in recent versions of Socialite.
+     */
+    protected function fakeSocialiteUser(array $attributes = []): SocialiteUser
+    {
+        $attributes = [
+            'id' => '123456789',
+            'nickname' => 'testuser',
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'avatar' => 'https://example.com/avatar.jpg',
+            'token' => 'fake-token',
+            'refreshToken' => 'fake-refresh-token',
+            'expiresIn' => 3600,
+            ...$attributes,
+        ];
+
+        return (new SocialiteUser)
+            ->setRaw($attributes)
+            ->map($attributes)
+            ->setToken($attributes['token'])
+            ->setRefreshToken($attributes['refreshToken'])
+            ->setExpiresIn($attributes['expiresIn']);
+    }
+
     protected function mockSocialiteUser(string $provider, array $attributes = []): SocialiteUser
     {
-        $user = SocialiteUser::fake($attributes);
+        $user = $this->fakeSocialiteUser($attributes);
 
         $mock = \Mockery::mock(Provider::class);
         $mock->shouldReceive('user')->andReturn($user);

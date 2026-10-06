@@ -4,7 +4,9 @@ namespace Datalogix\Guardian\Tests\Feature;
 
 use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Tests\TestCase;
+use PHPUnit\Framework\Attributes\Group;
 
+#[Group('socialite')]
 class GuardianServiceProviderMigrationsDisabledTest extends TestCase
 {
     protected function fortresses(): array

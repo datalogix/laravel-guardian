@@ -18,7 +18,6 @@ use Illuminate\Auth\Events\Registered;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Laravel\Socialite\Two\User as SocialiteUser;
 use Mockery;
 use PDOException;
 use PHPUnit\Framework\Attributes\Group;
@@ -225,7 +224,7 @@ class OAuthCallbackTest extends TestCase
         $method = new ReflectionMethod(OAuthCallback::class, 'storeIdentity');
         $method->setAccessible(true);
 
-        $oauthUser = SocialiteUser::fake(['id' => 'nm-1', 'email' => 'nm@example.com']);
+        $oauthUser = $this->fakeSocialiteUser(['id' => 'nm-1', 'email' => 'nm@example.com']);
 
         $method->invoke(app(OAuthCallback::class), 'github', 'nm-1', $oauthUser, new NonModelTwoFactorUser);
 

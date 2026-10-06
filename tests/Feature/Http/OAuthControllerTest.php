@@ -4,16 +4,18 @@ namespace Datalogix\Guardian\Tests\Feature\Http;
 
 use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Guardian;
+use Datalogix\Guardian\Tests\Feature\OAuth\Concerns\MocksSocialite;
 use Datalogix\Guardian\Tests\TestCase;
 use Laravel\Socialite\Contracts\Provider;
 use Laravel\Socialite\Facades\Socialite;
-use Laravel\Socialite\Two\User as SocialiteUser;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 
 #[Group('socialite')]
 class OAuthControllerTest extends TestCase
 {
+    use MocksSocialite;
+
     protected function fortresses(): array
     {
         return [Fortress::make()->basic()->emailVerification(isRequired: false)->oauth(providers: ['github'])];
@@ -42,7 +44,7 @@ class OAuthControllerTest extends TestCase
     public function test_callback_authenticates_and_responds(): void
     {
         $driver = \Mockery::mock(Provider::class);
-        $driver->shouldReceive('user')->andReturn(SocialiteUser::fake(['id' => 'gh-1', 'email' => 'callback@example.com', 'email_verified' => true]));
+        $driver->shouldReceive('user')->andReturn($this->fakeSocialiteUser(['id' => 'gh-1', 'email' => 'callback@example.com', 'email_verified' => true]));
         Socialite::shouldReceive('driver')->with('github')->andReturn($driver);
 
         $response = $this->get(Guardian::getOAuthFeature()->getCallbackUrl('github'));

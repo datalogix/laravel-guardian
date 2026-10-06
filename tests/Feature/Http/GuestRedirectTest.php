@@ -8,6 +8,7 @@ use Datalogix\Guardian\Tests\Attributes\WithFortresses;
 use Datalogix\Guardian\Tests\TestCase;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
@@ -15,6 +16,15 @@ use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
 class GuestRedirectTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // As in a request: Laravel sets its default destination when the HTTP kernel is
+        // made, before the application's and before Guardian wraps them.
+        $this->app->make(HttpKernel::class);
+    }
+
     protected function defineDashboard(): void
     {
         Route::middleware(['web', 'auth'])->get('/dashboard', fn () => 'dashboard');

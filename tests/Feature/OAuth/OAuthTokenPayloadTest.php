@@ -3,6 +3,7 @@
 namespace Datalogix\Guardian\Tests\Feature\OAuth;
 
 use Datalogix\Guardian\Support\OAuth\OAuthTokenPayload;
+use Datalogix\Guardian\Tests\Feature\OAuth\Concerns\MocksSocialite;
 use Datalogix\Guardian\Tests\TestCase;
 use Laravel\Socialite\Contracts\User as ProviderUser;
 use Laravel\Socialite\One\User as OAuthOneUser;
@@ -12,9 +13,11 @@ use PHPUnit\Framework\Attributes\Group;
 #[Group('socialite')]
 class OAuthTokenPayloadTest extends TestCase
 {
+    use MocksSocialite;
+
     public function test_it_extracts_the_payload_from_an_oauth2_user(): void
     {
-        $user = OAuthTwoUser::fake(['token' => 'access-token', 'refreshToken' => 'refresh-token', 'expiresIn' => 3600]);
+        $user = $this->fakeSocialiteUser(['token' => 'access-token', 'refreshToken' => 'refresh-token', 'expiresIn' => 3600]);
 
         $payload = (new OAuthTokenPayload)->fromProviderUser($user);
 

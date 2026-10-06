@@ -36,6 +36,9 @@
         "livewire/livewire": "^4.4",
         "phpunit/phpunit": "^11.5"
     },
+    "conflict": {
+        "laravel/framework": "12.69.0"
+    },
     "suggest": {
         "datalogix/tallkit": "Provides the <tk:> Blade components the bundled Livewire views are built with (^0.1).",
         "inertiajs/inertia-laravel": "Required to use the Inertia front-end (^2.0|^3.0).",
