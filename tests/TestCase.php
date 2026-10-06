@@ -6,6 +6,7 @@ use Datalogix\Guardian\Enums\Framework;
 use Datalogix\Guardian\Fortress;
 use Datalogix\Guardian\Guardian;
 use Datalogix\Guardian\GuardianServiceProvider;
+use Datalogix\Guardian\Support\Auth\GuestRedirect;
 use Datalogix\Guardian\Support\SessionState;
 use Datalogix\Guardian\Support\TwoFactor\DeliveredCodes;
 use Datalogix\Guardian\Tests\Attributes\WithFortresses;
@@ -46,6 +47,7 @@ abstract class TestCase extends AbstractPackageTestCase
         // The links of these notifications are static, so they outlive the application.
         ResetPassword::createUrlUsing(null);
         VerifyEmail::createUrlUsing(null);
+        GuestRedirect::forget();
 
         parent::tearDown();
     }
@@ -75,6 +77,8 @@ abstract class TestCase extends AbstractPackageTestCase
         $app['config']->set('app.name', 'Guardian Tests');
         $app['config']->set('auth.timebox_duration', 0);
         $app['view']->addNamespace('guardian-tests', __DIR__.'/Fixtures/views');
+        // Like published views: the bundled ones need tallkit, which the tests do not install.
+        $app['view']->prependNamespace('guardian', __DIR__.'/Fixtures/views/guardian');
 
         // What Application::configure()->withEvents() registers in every Laravel 11+ app.
         $app['events']->listen(Registered::class, SendEmailVerificationNotification::class);
@@ -86,6 +90,16 @@ abstract class TestCase extends AbstractPackageTestCase
             'client_secret' => 'test-github-client-secret',
             'redirect' => 'http://localhost/oauth/github/callback',
         ]);
+
+        // DB_CONNECTION picks MySQL or Postgres; the parent test case always picks SQLite in memory.
+        if (in_array($connection = env('DB_CONNECTION'), ['mysql', 'mariadb', 'pgsql'], true)) {
+            $app['config']->set('database.default', $connection);
+        }
+
+        // A real database outlives the test: every test starts from no tables.
+        if ($app['db']->connection()->getDriverName() !== 'sqlite') {
+            $app['db']->connection()->getSchemaBuilder()->dropAllTables();
+        }
 
         $this->runMigration(__DIR__.'/database/migrations/0000_00_00_000000_create_users_table.php');
 
@@ -163,7 +177,8 @@ abstract class TestCase extends AbstractPackageTestCase
     {
         return User::create([
             'name' => 'Test User',
-            'email' => Str::random(12).'@example.com',
+            // Stored the way Guardian stores it: in lower case.
+            'email' => Str::lower(Str::random(12)).'@example.com',
             'password' => Hash::make('password'),
             ...$attributes,
         ]);

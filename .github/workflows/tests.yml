@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: read
 
-    name: Typecheck Inertia pages
+    name: Lint and typecheck Inertia pages
 
     steps:
       - name: Checkout code
@@ -29,6 +29,9 @@ jobs:
 
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+
+      - name: Lint Vue and React pages
+        run: npm run lint
 
       - name: Typecheck Vue and React pages
         run: npm run typecheck
@@ -70,3 +73,70 @@ jobs:
 
       - name: Execute tests
         run: vendor/bin/phpunit --no-coverage --exclude-group ${{ matrix.group }}
+
+  databases:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    # The main tests run on SQLite in memory; these run them on real databases,
+    # where unique violations, column order and row locks behave their own way.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - connection: mysql
+            name: MySQL 8.4
+            port: 3306
+            username: root
+          - connection: pgsql
+            name: PostgreSQL 17
+            port: 5432
+            username: postgres
+
+    name: On ${{ matrix.name }}
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: guardian_testing
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: guardian_testing
+        ports:
+          - 5432:5432
+        options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_mysql, pdo_pgsql, gd
+          coverage: none
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-interaction
+
+      - name: Execute tests
+        run: vendor/bin/phpunit --no-coverage
+        env:
+          DB_CONNECTION: ${{ matrix.connection }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: ${{ matrix.port }}
+          DB_DATABASE: guardian_testing
+          DB_USERNAME: ${{ matrix.username }}
+          DB_PASSWORD: ${{ matrix.connection == 'pgsql' && 'postgres' || '' }}
